@@ -37,6 +37,7 @@ import {
 } from "@/lib/scheduling";
 import { profileSchema, typeSchema } from "@/lib/validation";
 import { appointmentMail, saveSmtp, sendMail, smtpAction } from "@/lib/mail";
+import { requestUpdate, updateInfo } from "@/lib/updates";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ path: string[] }> };
@@ -358,6 +359,14 @@ async function handle(req: NextRequest, ctx: Context) {
             await tx.appSettings.update({ where: { id: 1 }, data: values });
             await audit(tx, "SETTINGS_CHANGED", actor.id);
           });
+        } else if (path === "updates" && !post) result = await updateInfo();
+        else if (path === "updates" && post) {
+          await rateLimit(`update:${actor.id}`, 3, 300);
+          const { version } = z
+            .object({ version: z.string().regex(/^v\d+\.\d+\.\d+$/) })
+            .parse(data);
+          result = await requestUpdate(version);
+          await audit(db, "UPDATE_REQUESTED", actor.id, version);
         } else if (path === "audit" && !post)
           result = await db.auditLog.findMany({
             orderBy: { createdAt: "desc" },

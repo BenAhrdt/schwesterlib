@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+: "${APP_DIR:?APP_DIR fehlt}"
+: "${APP_USER:?APP_USER fehlt}"
+: "${APP_GROUP:?APP_GROUP fehlt}"
+: "${APP_HOME:?APP_HOME fehlt}"
+: "${COMPOSE_PROJECT_NAME:=schwesterlib}"
+readonly request=/run/schwesterlib/requests/update-request
+readonly status=/run/schwesterlib/update-status.json
+readonly repository=https://github.com/BenAhrdt/schwesterlib.git
+backup=""
+backup_complete=false
+
+write_status() {
+  local state=$1 stage=$2 message=$3 version=${4:-}
+  local temporary
+  temporary=$(mktemp "${status}.XXXXXX")
+  printf '{"state":"%s","stage":"%s","message":"%s","version":"%s","updatedAt":"%s"}\n' \
+    "$state" "$stage" "$message" "$version" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$temporary"
+  chown "root:$APP_GROUP" "$temporary"
+  chmod 0640 "$temporary"
+  mv -f "$temporary" "$status"
+}
+as_app() {
+  if [[ $APP_USER == root ]]; then
+    env -i HOME="$APP_HOME" USER=root LOGNAME=root PATH=/usr/bin:/bin "$@"
+  else
+    runuser -u "$APP_USER" -- env -i HOME="$APP_HOME" USER="$APP_USER" \
+      LOGNAME="$APP_USER" PATH=/usr/bin:/bin "$@"
+  fi
+}
+failed() {
+  local code=$?
+  rm -f "$request"
+  if [[ -n $backup && $backup_complete == false ]]; then rm -f "$backup"; fi
+  write_status failed failed "Update fehlgeschlagen. Details stehen im Systemprotokoll." "${tag:-}"
+  systemctl start schwesterlib.service || true
+  exit "$code"
+}
+trap failed ERR
+
+exec 9>/run/lock/schwesterlib-update.lock
+flock -n 9 || exit 0
+[[ -f $request && ! -L $request ]]
+IFS= read -r tag < "$request"
+rm -f "$request"
+[[ $tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+[[ -d $APP_DIR/.git && -f $APP_DIR/.env && ! -L $APP_DIR/.env ]]
+cd "$APP_DIR"
+write_status running prepare "Release wird geprüft." "$tag"
+[[ -z $(as_app /usr/bin/git status --porcelain --untracked-files=all) ]]
+as_app /usr/bin/git fetch --force "$repository" \
+  "+refs/heads/main:refs/remotes/origin/main" \
+  "+refs/tags/$tag:refs/tags/$tag"
+target=$(as_app /usr/bin/git rev-list -n 1 "$tag")
+as_app /usr/bin/git merge-base --is-ancestor HEAD "$target"
+as_app /usr/bin/git merge-base --is-ancestor "$target" refs/remotes/origin/main
+
+install -d -m 700 /var/backups/schwesterlib /var/log/schwesterlib-deploy
+backup=$(mktemp "/var/backups/schwesterlib/before-${tag}-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX.dump")
+write_status running backup "Datenbank wird gesichert." "$tag"
+/usr/bin/docker compose --env-file "$APP_DIR/.env" -p "$COMPOSE_PROJECT_NAME" \
+  -f "$APP_DIR/docker-compose.yml" exec -T db sh -c \
+  'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom' > "$backup"
+[[ -s $backup ]]
+/usr/bin/docker compose --env-file "$APP_DIR/.env" -p "$COMPOSE_PROJECT_NAME" \
+  -f "$APP_DIR/docker-compose.yml" exec -T db pg_restore --list < "$backup" > /dev/null
+backup_complete=true
+
+write_status running stop "Anwendung wird für das Update angehalten." "$tag"
+systemctl stop schwesterlib.service
+write_status running install "Programmdateien und Abhängigkeiten werden aktualisiert." "$tag"
+as_app /usr/bin/git merge --ff-only "$target"
+as_app /usr/bin/npm ci --include=dev
+as_app /usr/bin/npm run db:generate
+write_status running migrate "Datenbankmigrationen werden angewendet." "$tag"
+as_app /usr/bin/npm run db:migrate
+write_status running build "Produktionsversion wird erstellt." "$tag"
+as_app /usr/bin/env NODE_OPTIONS=--max-old-space-size=2048 /usr/bin/npm run build
+write_status running restart "SchwesterLib wird neu gestartet." "$tag"
+systemctl start schwesterlib.service
+for attempt in {1..30}; do
+  if /usr/bin/curl --fail --silent --max-time 3 http://127.0.0.1:3000/api/health > /dev/null; then
+    write_status success complete "Update erfolgreich installiert." "$tag"
+    exit 0
+  fi
+  sleep 2
+done
+false

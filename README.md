@@ -1,6 +1,6 @@
 # SchwesterLib
 
-Aktuelle Version: **1.1.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md).
+Aktuelle Version: **1.2.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md).
 
 **Meine Schwester. Mein Termin. Mein Verband.** Eine private, einladungsbasierte Terminplattform mit eigener blau-türkiser Oberfläche, responsiven Dashboards und echter PostgreSQL-Buchungslogik. Keine öffentliche Registrierung und keine medizinischen Behandlungsnotizen.
 
@@ -98,6 +98,8 @@ Neue Einladungen mit E-Mail werden bei eingerichteter SMTP-Konfiguration automat
 ## Production
 
 Die konkrete Anleitung für den separaten Debian-13-LXC, Zoraxy, den Umzug von `/root/schwesterlib` nach `/srv/schwesterlib`, systemd, Updates und Backups steht in [docs/PRODUCTION.md](docs/PRODUCTION.md). Bestehende Produktionsdatenbank, Admin und `.env` bleiben erhalten. Entwicklungs- und Browsertests laufen ausschließlich auf `webDev` mit einer separaten Testdatenbank.
+
+Administratoren können nach einmaliger Einrichtung des getrennten systemd-Updaters unter **Einstellungen** neue veröffentlichte Versionen prüfen und installieren. Die Webanwendung selbst erhält dabei keine Root-, Docker- oder systemd-Rechte. Einrichtung und Recovery stehen im Abschnitt „Updates aus der Weboberfläche“ der Produktionsanleitung.
 
 ```bash
 npm ci

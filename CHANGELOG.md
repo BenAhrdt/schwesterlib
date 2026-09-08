@@ -2,6 +2,18 @@
 
 Alle wesentlichen Änderungen an SchwesterLib werden in dieser Datei dokumentiert.
 
+## [1.2.0] – 2026-09-08
+
+### Behoben
+
+- Bei einem Behandler zeigt „Meine Termine“ jetzt auch Termine an, die andere Personen bei diesem Behandler gebucht haben.
+
+### Neu
+
+- Administratoren können unter **Einstellungen** nach veröffentlichten GitHub-Releases suchen, Release-Hinweise ansehen und ein Update starten.
+- Die Updateansicht zeigt Backup, Installation, Migration, Build und Neustart als laufenden Vorgang; nach erfolgreichem Neustart lädt sie automatisch neu.
+- Ein separater systemd-Updater installiert ausschließlich veröffentlichte, vorwärtsgerichtete Releases aus dem fest eingetragenen SchwesterLib-Repository. Vor jeder Migration wird PostgreSQL gesichert.
+
 ## [1.1.0] – 2026-09-08
 
 ### Neu
@@ -30,5 +42,6 @@ Alle wesentlichen Änderungen an SchwesterLib werden in dieser Datei dokumentier
 
 - Erste vollständige Version mit geschlossenem Einladungssystem, Rollen, Terminverwaltung, Verfügbarkeiten, Kalender, SMTP-Konfiguration und abgesichertem Initial-Setup.
 
+[1.2.0]: https://github.com/BenAhrdt/schwesterlib/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/BenAhrdt/schwesterlib/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/BenAhrdt/schwesterlib/releases/tag/v1.0.0

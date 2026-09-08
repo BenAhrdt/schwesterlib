@@ -1,0 +1,15 @@
+[Unit]
+Description=Install a requested SchwesterLib release
+Requires=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/schwesterlib-update.conf
+ExecStart=/usr/local/libexec/schwesterlib-update
+TimeoutStartSec=infinity
+UMask=0077
+PrivateTmp=true
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=schwesterlib-update

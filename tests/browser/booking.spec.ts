@@ -172,6 +172,12 @@ test("Setup, Einladung, mobile Buchung, Verschieben, Absage und API-Rechte", asy
   await expect(
     patient.getByText("Ihr Termin wurde erfolgreich gebucht."),
   ).toBeVisible();
+  await providerPage.goto("/appointments");
+  await expect(
+    providerPage.getByText("Verbandswechsel", { exact: true }),
+  ).toBeVisible();
+  await providerPage.getByRole("button", { name: "Details", exact: true }).click();
+  await expect(providerPage.getByText(/Gebucht für:/)).toContainText("patient");
   expect(
     await patient.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

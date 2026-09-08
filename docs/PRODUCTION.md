@@ -23,6 +23,7 @@ Diese Schritte als root auf dem **Produktions-LXC** ausführen, nachdem der neue
    ```
 
    Die Anleitung setzt den bisherigen Projektnamen `schwesterlib` voraus. Container-Mount mit `docker inspect --format '{{range .Mounts}}{{println .Name .Destination}}{{end}}' CONTAINER_ID` kontrollieren: `schwesterlib_postgres_data` muss `/var/lib/postgresql/data` zugeordnet sein. Bei anderem Projektnamen zuerst Anleitung und Scripts an den **bestehenden** Namen anpassen. Niemals zur Fehlerbehebung ein leeres Volume anlegen. Compose-Namen bestimmen die Volume-Zuordnung ([Docker-Dokumentation](https://docs.docker.com/compose/how-tos/project-name/)).
+
 3. Den bisher manuell gestarteten Next-Prozess im zugehörigen Terminal beenden. Datenbank laufen lassen. Noch vor dem Umzug ein Backup erstellen:
 
    ```bash
@@ -33,6 +34,7 @@ Diese Schritte als root auf dem **Produktions-LXC** ausführen, nachdem der neue
    ```
 
    Bei Fehler abbrechen. Einen bereits vorhandenen Backupnamen nicht wiederverwenden.
+
 4. Benutzer anlegen und das **vorhandene** Verzeichnis verschieben. Falls Benutzer oder Ziel bereits existieren, erst deren Zustand prüfen:
 
    ```bash
@@ -46,6 +48,7 @@ Diese Schritte als root auf dem **Produktions-LXC** ausführen, nachdem der neue
    ```
 
    Root bleibt für systemd und Docker zuständig. Der App-Benutzer erhält **keine** Docker-Gruppenmitgliedschaft und kein sudo. Er besitzt Repository, Dependencies und Build-Dateien für Git/npm-Updates; systemd beschränkt Schreibzugriffe des laufenden Dienstes auf `.next`. `/root` wird nicht zugänglich gemacht. Für ein privates GitHub-Repository einen nur lesenden Deploy-Key für den App-Benutzer einrichten; keine Tokens in Git-URLs speichern.
+
 5. Vorhandene `.env` beibehalten. `DATABASE_URL` muss auf `localhost:5432` oder `127.0.0.1:5432`, Datenbank/Benutzer `schwesterlib`, zeigen. URL-kodiertes Passwort muss `POSTGRES_PASSWORD` entsprechen. `APP_URL` ist die öffentliche HTTPS-Origin ohne Pfad oder abschließenden Slash. Session-/Verschlüsselungs-/Setup-Secrets bleiben identisch. Keine zusätzlichen `.env.local` oder `.env.production*` anlegen. Next.js und Hilfsscripts laden `.env` selbst; systemd enthält keine Secrets und verwendet keinen anders interpretierenden `EnvironmentFile`-Parser.
 6. Abhängigkeiten, Konfiguration und Build prüfen, dann den Dienst installieren:
 
@@ -91,6 +94,29 @@ Das Script prüft Konfiguration, sauberen Branch, Datenbank und Dienst; sperrt p
 
 Bei Fehlern bleibt die App ab Beginn der Wartungsphase gestoppt. Es gibt keinen automatischen Code-/Datenbank-Rollback. Der alte Commit wird ausgegeben. Build-/Migrationsausgaben liegen ausschließlich in root-lesbaren Dateien unter `/var/log/schwesterlib-deploy`; vor Weitergabe auf sensible Inhalte prüfen. Scripts geben keine Environment-Werte aus und verwenden kein Shell-Tracing. Änderungen an der systemd-Datei werden bewusst separat geprüft und mit `install`, `daemon-reload`, `restart` wie oben übernommen; das Script installiert keine neuen Root-Dienstdefinitionen automatisch.
 
+### Updates aus der Weboberfläche
+
+Ab Version 1.2.0 können Administratoren unter **Einstellungen → SchwesterLib aktualisieren** das neueste veröffentlichte GitHub-Release prüfen und installieren. Dafür ist einmalig ein lokaler systemd-Updater einzurichten. Erst das Release wie gewohnt über die Konsole installieren, dann im Projektverzeichnis als root ausführen:
+
+```bash
+bash scripts/install-web-updater.sh
+systemctl status schwesterlib-update.path --no-pager
+```
+
+Das Installationsscript erkennt Arbeitsverzeichnis, Benutzer und Gruppe des vorhandenen `schwesterlib.service`. Es installiert einen root-eigenen, nicht von der Webanwendung veränderbaren Helfer unter `/usr/local/libexec`, zwei systemd-Einheiten und eine Service-Ergänzung mit ausschließlich den Pfaden für Updateauftrag und Status. Danach startet es die Anwendung neu. Es verändert `.env`, Datenbank und Docker-Volume nicht.
+
+Der Browser darf nur einen semantischen Release-Tag anfordern, der von der GitHub-API als neuestes veröffentlichtes Release gemeldet wird. Der Helfer lädt diesen Tag aus dem fest eingetragenen Repository, akzeptiert nur Vorwärtsupdates, prüft, dass der Tag in `main` enthalten ist, erstellt ein Datenbankbackup und führt Installation, Migration, Build und Neustart aus. Die Anwendung besitzt keine direkten systemd- oder Docker-Rechte. Während ihres Neustarts können einzelne Statusabfragen kurz fehlschlagen; die Seite verbindet sich weiter und lädt nach Erfolg neu.
+
+Status und Fehler lassen sich auf der Konsole prüfen:
+
+```bash
+systemctl status schwesterlib-update.service --no-pager
+journalctl -u schwesterlib-update -n 150 --no-pager
+cat /run/schwesterlib/update-status.json
+```
+
+Bei einem Fehler versucht der Helfer, den Dienst wieder zu starten, und zeigt in der Weboberfläche nur eine allgemeine Meldung. Details und mögliche sensible Ausgaben bleiben im lokalen Journal. Datenbankmigrationen werden nicht automatisch zurückgerollt. Vor dem ersten echten Webupdate empfiehlt sich deshalb ein Snapshot des LXC und ein Test mit einem kleinen Bugfix-Release.
+
 ## Backups und Recovery
 
 ```bash
@@ -124,10 +150,10 @@ Auf webDev gehören die folgenden Dateien zum Commit, einschließlich der vorher
 ```bash
 cd /home/ben/schwesterlib
 git rm --cached --ignore-unmatch next-env.d.ts
-git add .env.example .gitignore README.md docs/PRODUCTION.md docs/RECOVERY.md deploy/systemd/schwesterlib.service scripts/backup-production.sh scripts/check-production.mjs scripts/deploy-production.sh scripts/wait-for-database.mjs src/app/api/health/route.ts src/app/globals.css tests/deployment.test.ts tests/production.test.ts tests/browser/booking.spec.ts
+git add .env.example .gitignore CHANGELOG.md README.md docs/PRODUCTION.md docs/RECOVERY.md deploy/systemd scripts/backup-production.sh scripts/check-production.mjs scripts/deploy-production.sh scripts/install-web-updater.sh scripts/wait-for-database.mjs src/app/api/health/route.ts src/app/globals.css src/lib/updates.ts tests/deployment.test.ts tests/production.test.ts tests/updates.test.ts tests/browser/booking.spec.ts
 git add prisma/schema.prisma prisma/migrations/202609080002_provider_drafts_notifications/migration.sql src/lib/accounts.ts src/lib/mail.ts src/lib/scheduling.ts src/lib/validation.ts src/components/workspace.tsx 'src/app/api/[...path]/route.ts' tests/integration.test.ts tests/mail.test.ts tests/provider-migration.test.ts
 git diff --cached --stat
-git commit -m "Add provider drafts, appointment notifications and production deployment"
+git commit -m "Release v1.2.0"
 git push origin main
 ```
 

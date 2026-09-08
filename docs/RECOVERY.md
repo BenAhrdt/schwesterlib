@@ -27,6 +27,10 @@ Start- und Einrichtungsanleitung sowie bewusste Funktionsgrenzen stehen in `READ
 
 Offene Behandlereinladungen erhalten ein vorbereitbares Profil ohne Benutzerkonto. Annahme verknüpft dieses Profil atomar mit dem neuen Konto. Entwürfe bleiben aus Katalog und Slotberechnung ausgeschlossen. Die neue Migration `202609080002_provider_drafts_notifications` erhält vorhandene Konten und Termine und legt Entwürfe für offene Behandlereinladungen nachträglich an. Vor dem späteren Produktionsupdate sichern und Migrationen ausführen; hier wurde nur die Testdatenbank migriert.
 
-Der neue Schalter im Behandlerprofil aktiviert organisatorische E-Mails bei Buchung, Verschiebung und Absage. Standard ist aus; SMTP und eine Kontoadresse sind erforderlich. Pushnachrichten und die Updateoberfläche bleiben spätere Schritte.
+Der neue Schalter im Behandlerprofil aktiviert organisatorische E-Mails bei Buchung, Verschiebung und Absage. Standard ist aus; SMTP und eine Kontoadresse sind erforderlich. Pushnachrichten bleiben ein späterer Schritt.
 
 Geprüft: 36 Unit-/Integrationstests plus ein Migrationstest mit altem Datenbestand, außerdem der erweiterte vollständige Browsertest mit Entwurfsbearbeitung und Übernahme bei Annahme. Typecheck, Linter und Produktionsbuild erfolgreich. E-Mail-Verhalten mit simuliertem Transport getestet; kein Versand über den Produktions-Mailserver ausgeführt.
+
+## Version 1.2.0
+
+Die Behandleransicht „Meine Termine“ berücksichtigt jetzt auch Termine, die andere Benutzer bei diesem Behandler gebucht haben. Die Updatefunktion liegt unter **Administration → Einstellungen**. Sie prüft veröffentlichte GitHub-Releases und reicht Installationsaufträge an einen getrennten systemd-Helfer weiter. Dieser muss nach dem Konsolenupdate auf 1.2.0 einmalig mit `scripts/install-web-updater.sh` eingerichtet werden. Die Webanwendung erhält keine Root-, Docker- oder systemd-Rechte.

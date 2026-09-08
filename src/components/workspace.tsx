@@ -1,5 +1,12 @@
 "use client";
-import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -35,6 +42,9 @@ import {
   ClipboardList,
   Copy,
   X,
+  RefreshCw,
+  Download,
+  ExternalLink,
 } from "lucide-react";
 import type { Actor } from "@/lib/auth";
 import { Brand } from "./brand";
@@ -838,7 +848,12 @@ function Appointments({
     [detail, setDetail] = useState<Appointment>(),
     [moving, setMoving] = useState<Appointment>(),
     [cancel, setCancel] = useState<Appointment>();
-  const filtered = data?.filter((a) => !own || a.userId === user.id);
+  const filtered = data?.filter(
+    (a) =>
+      !own ||
+      a.userId === user.id ||
+      (user.role === "PROVIDER" && a.providerId === user.provider?.id),
+  );
   async function status(a: Appointment, value: string) {
     setBusy(true);
     setFailure("");
@@ -2017,7 +2032,169 @@ function SettingsPanel() {
             ausschließlich eingeladen oder administrativ angelegt.
           </p>
         </div>
+        <UpdatePanel />
       </section>
+    </div>
+  );
+}
+type UpdateInfo = {
+  currentVersion: string;
+  latestVersion: string;
+  updateAvailable: boolean;
+  configured: boolean;
+  release: {
+    name: string;
+    notes: string;
+    url: string;
+    publishedAt: string | null;
+  };
+  status: {
+    state: "idle" | "requested" | "running" | "success" | "failed";
+    stage?: string;
+    message?: string;
+    version?: string;
+  };
+};
+function UpdatePanel() {
+  const [info, setInfo] = useState<UpdateInfo>(),
+    [error, setError] = useState(""),
+    [checking, setChecking] = useState(true),
+    [installing, setInstalling] = useState(false);
+  const initiated = useRef(false);
+  const check = useCallback(async () => {
+    try {
+      const next = await api<UpdateInfo>("updates");
+      setInfo(next);
+      setError("");
+      if (["requested", "running"].includes(next.status.state))
+        setInstalling(true);
+      if (next.status.state === "failed") setInstalling(false);
+      if (next.status.state === "success" && initiated.current) {
+        initiated.current = false;
+        window.setTimeout(() => window.location.reload(), 1200);
+      }
+    } catch (cause) {
+      if (!initiated.current) setError((cause as Error).message);
+    } finally {
+      setChecking(false);
+    }
+  }, []);
+  useEffect(() => {
+    const initial = window.setTimeout(() => void check(), 0);
+    const timer = window.setInterval(
+      () => void check(),
+      installing ? 2000 : 300000,
+    );
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(timer);
+    };
+  }, [check, installing]);
+  async function install() {
+    if (
+      !info ||
+      !window.confirm(
+        `Update ${info.latestVersion} jetzt installieren? Vor der Migration wird automatisch ein Datenbankbackup erstellt.`,
+      )
+    )
+      return;
+    initiated.current = true;
+    setInstalling(true);
+    setError("");
+    try {
+      await api("updates", { version: info.latestVersion });
+    } catch (cause) {
+      // The application can disconnect immediately after accepting the request.
+      window.setTimeout(() => void check(), 1500);
+      if (cause instanceof Error && cause.message !== "Failed to fetch")
+        setError(cause.message);
+    }
+  }
+  const active =
+    installing ||
+    ["requested", "running"].includes(info?.status.state ?? "idle");
+  return (
+    <div className="update-panel">
+      <div className="panel-title">
+        <div>
+          <span className="eyebrow">SYSTEMUPDATE</span>
+          <h2>SchwesterLib aktualisieren</h2>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={checking || active}
+          onClick={() => {
+            setChecking(true);
+            void check();
+          }}
+        >
+          <RefreshCw size={15} className={checking ? "spin" : ""} />
+          Prüfen
+        </Button>
+      </div>
+      <Notice error={error} />
+      {!info ? (
+        <p className="muted">Releaseinformationen werden geladen …</p>
+      ) : (
+        <>
+          <div className="version-row">
+            <span>
+              Installiert <strong>v{info.currentVersion}</strong>
+            </span>
+            <span>
+              Aktuell <strong>{info.latestVersion}</strong>
+            </span>
+          </div>
+          {active && (
+            <div className="update-progress" role="status" aria-live="polite">
+              <span className="update-progress-bar" />
+              <strong>
+                {info.status.message ?? "Update wird vorbereitet …"}
+              </strong>
+              <small>
+                Die Verbindung kann während des Neustarts kurz unterbrochen
+                sein. Diese Seite verbindet sich automatisch wieder.
+              </small>
+            </div>
+          )}
+          {info.status.state === "failed" && (
+            <p className="alert error" role="alert">
+              {info.status.message ??
+                "Das Update ist fehlgeschlagen. Bitte das Systemprotokoll prüfen."}
+            </p>
+          )}
+          {!active && info.updateAvailable && (
+            <Button disabled={!info.configured} onClick={install}>
+              <Download size={16} /> {info.latestVersion} installieren
+            </Button>
+          )}
+          {!info.configured && (
+            <p className="alert">
+              Der Web-Updater muss einmalig auf dem Server eingerichtet werden.
+            </p>
+          )}
+          {!active &&
+            !info.updateAvailable &&
+            info.status.state !== "failed" && (
+              <p className="success-text">SchwesterLib ist aktuell.</p>
+            )}
+          <details className="detail-item">
+            <summary>Hinweise zu {info.release.name}</summary>
+            <pre className="release-notes">
+              {info.release.notes || "Keine Release-Hinweise vorhanden."}
+            </pre>
+            <a
+              className="text-link"
+              href={info.release.url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Release auf GitHub öffnen <ExternalLink size={14} />
+            </a>
+          </details>
+        </>
+      )}
     </div>
   );
 }
