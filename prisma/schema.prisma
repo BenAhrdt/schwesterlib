@@ -1,0 +1,152 @@
+generator client {
+  provider = "prisma-client"
+  output = "../src/generated/prisma"
+}
+datasource db {
+  provider = "postgresql"
+}
+enum Role {
+  ADMIN
+  PROVIDER
+  USER
+}
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+enum InvitationStatus {
+  OPEN
+  USED
+  REVOKED
+}
+model User {
+  id String @id @default(cuid())
+  username String @unique
+  displayName String
+  email String? @unique
+  emailVerifiedAt DateTime? @db.Timestamptz(3)
+  passwordHash String
+  role Role @default(USER)
+  active Boolean @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  provider ProviderProfile?
+  sessions Session[]
+  appointments Appointment[]
+}
+model Session {
+  id String @id
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime @db.Timestamptz(3)
+  @@index([userId])
+  @@index([expiresAt])
+}
+model ProviderProfile {
+  id String @id @default(cuid())
+  userId String @unique
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  specialty String @default("Professioneller Verbandswechsel & Geschwistermedizin")
+  description String @default("")
+  location String @default("Zu Hause")
+  imageUrl String @default("")
+  qualifications String @default("")
+  timezone String @default("Europe/Berlin")
+  active Boolean @default(true)
+  types AppointmentType[]
+  rules AvailabilityRule[]
+  exceptions AvailabilityException[]
+  appointments Appointment[]
+}
+model AppointmentType {
+  id String @id @default(cuid())
+  name String
+  description String @default("")
+  duration Int
+  bufferBefore Int @default(0)
+  bufferAfter Int @default(0)
+  active Boolean @default(true)
+  color String @default("teal")
+  providers ProviderProfile[]
+  appointments Appointment[]
+}
+model AvailabilityRule {
+  id String @id @default(cuid())
+  providerId String
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  weekday Int
+  startMinute Int
+  endMinute Int
+  @@index([providerId, weekday])
+}
+model AvailabilityException {
+  id String @id @default(cuid())
+  providerId String
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  startsAt DateTime @db.Timestamptz(3)
+  endsAt DateTime @db.Timestamptz(3)
+  available Boolean @default(false)
+  @@index([providerId, startsAt])
+}
+model Appointment {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  providerId String
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  typeId String
+  type AppointmentType @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  typeName String
+  startsAt DateTime @db.Timestamptz(3)
+  endsAt DateTime @db.Timestamptz(3)
+  occupiedStart DateTime @db.Timestamptz(3)
+  occupiedEnd DateTime @db.Timestamptz(3)
+  status AppointmentStatus @default(CONFIRMED)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([providerId, startsAt])
+  @@index([userId, startsAt])
+}
+model Invitation {
+  id String @id @default(cuid())
+  tokenHash String @unique
+  email String?
+  displayName String?
+  role Role
+  status InvitationStatus @default(OPEN)
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  createdBy String
+  @@index([status, expiresAt])
+}
+model EmailConfiguration {
+  id Int @id @default(1)
+  host String
+  port Int
+  secure Boolean @default(false)
+  username String
+  passwordEncrypted String
+  senderName String
+  senderAddress String
+}
+model AuditLog {
+  id String @id @default(cuid())
+  actorId String?
+  action String
+  targetId String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([createdAt])
+}
+model AppSettings {
+  id Int @id @default(1)
+  setupCompleted Boolean @default(false)
+  name String @default("SchwesterLib")
+  bookingHorizonDays Int @default(90)
+}
+model RateLimit {
+  key String @id
+  count Int
+  resetAt DateTime @db.Timestamptz(3)
+  @@index([resetAt])
+}
