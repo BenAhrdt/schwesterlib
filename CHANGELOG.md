@@ -2,6 +2,18 @@
 
 Alle wesentlichen Änderungen an SchwesterLib werden in dieser Datei dokumentiert.
 
+## [1.3.0] – 2026-09-08
+
+### Neu
+
+- Administratoren können in der Benutzerverwaltung einen eine Stunde gültigen, einmal verwendbaren Link zum Zurücksetzen eines vergessenen Passworts erzeugen und kopieren.
+- Benutzer vergeben über den Reset-Link selbst ein neues Passwort; der Administrator sieht weder das alte noch das neue Passwort.
+- Nach erfolgreichem Zurücksetzen werden alle Sitzungen des betroffenen Kontos beendet. Erstellung und Verwendung des Links werden im Audit-Protokoll erfasst.
+
+### Sicherheit
+
+- Reset-Token werden ausschließlich als SHA-256-Hash gespeichert. Ein neuer Link widerruft vorherige Reset-Links dieses Kontos; deaktivierte Konten können keinen Reset-Link verwenden.
+
 ## [1.2.0] – 2026-09-08
 
 ### Behoben
@@ -42,6 +54,7 @@ Alle wesentlichen Änderungen an SchwesterLib werden in dieser Datei dokumentier
 
 - Erste vollständige Version mit geschlossenem Einladungssystem, Rollen, Terminverwaltung, Verfügbarkeiten, Kalender, SMTP-Konfiguration und abgesichertem Initial-Setup.
 
+[1.3.0]: https://github.com/BenAhrdt/schwesterlib/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/BenAhrdt/schwesterlib/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/BenAhrdt/schwesterlib/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/BenAhrdt/schwesterlib/releases/tag/v1.0.0

@@ -31,6 +31,10 @@ Der neue Schalter im Behandlerprofil aktiviert organisatorische E-Mails bei Buch
 
 Geprüft: 36 Unit-/Integrationstests plus ein Migrationstest mit altem Datenbestand, außerdem der erweiterte vollständige Browsertest mit Entwurfsbearbeitung und Übernahme bei Annahme. Typecheck, Linter und Produktionsbuild erfolgreich. E-Mail-Verhalten mit simuliertem Transport getestet; kein Versand über den Produktions-Mailserver ausgeführt.
 
+## Version 1.3.0
+
+Administratoren können unter **Administration → Benutzer** einen einmaligen Passwort-Reset-Link erzeugen. Das Update legt dafür ausschließlich die Tabelle `PasswordResetToken` an; bestehende Benutzer, Passwörter, Sitzungen und Termine bleiben erhalten. Der Web-Updater führt die Migration automatisch aus.
+
 ## Version 1.2.0
 
 Die Behandleransicht „Meine Termine“ berücksichtigt jetzt auch Termine, die andere Benutzer bei diesem Behandler gebucht haben. Die Updatefunktion liegt unter **Administration → Einstellungen**. Sie prüft veröffentlichte GitHub-Releases und reicht Installationsaufträge an einen getrennten systemd-Helfer weiter. Dieser muss nach dem Konsolenupdate auf 1.2.0 einmalig mit `scripts/install-web-updater.sh` eingerichtet werden. Die Webanwendung erhält keine Root-, Docker- oder systemd-Rechte.

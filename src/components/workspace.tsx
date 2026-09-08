@@ -45,6 +45,7 @@ import {
   RefreshCw,
   Download,
   ExternalLink,
+  KeyRound,
 } from "lucide-react";
 import type { Actor } from "@/lib/auth";
 import { Brand } from "./brand";
@@ -1437,10 +1438,81 @@ function UsersPanel() {
                 Konto aktiv
               </label>
             </ActionForm>
+            <PasswordResetAction userId={u.id} active={u.active} />
           </details>
         ))}
       </section>
     </>
+  );
+}
+
+function PasswordResetAction({
+  userId,
+  active,
+}: {
+  userId: string;
+  active: boolean;
+}) {
+  const [reset, setReset] = useState<{
+    link: string;
+    expiresAt: string;
+  }>();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  async function createReset() {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await api<{
+        link: string;
+        expiresAt: string;
+      }>("users/password-reset", { userId });
+      setReset(result);
+      setMessage("Der Link kann jetzt kopiert und weitergegeben werden.");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="form-stack">
+      <Button
+        type="button"
+        variant="outline"
+        disabled={busy || !active}
+        onClick={createReset}
+      >
+        <KeyRound size={16} />
+        {busy ? "Link wird erstellt …" : "Passwort zurücksetzen"}
+      </Button>
+      {!active && <small>Aktiviere das Konto zuerst.</small>}
+      <Notice error={error} message={message} />
+      {reset && (
+        <div className="invite-link">
+          <strong>Einmaliger Reset-Link</strong>
+          <p>Gültig bis {dateLabel(reset.expiresAt)} Uhr.</p>
+          <input readOnly value={reset.link} aria-label="Passwort-Reset-Link" />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(reset.link);
+                setMessage("Reset-Link kopiert.");
+              } catch {
+                setMessage("Bitte den Link im Feld markieren und kopieren.");
+              }
+            }}
+          >
+            <Copy size={16} />
+            Reset-Link kopieren
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 function Providers({ availability }: { availability: boolean }) {

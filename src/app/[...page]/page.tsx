@@ -1,6 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
-import { inspectInvitation, setupOpen } from "@/lib/accounts";
+import {
+  inspectInvitation,
+  inspectPasswordReset,
+  setupOpen,
+} from "@/lib/accounts";
 import { Brand } from "@/components/brand";
 import { AuthForm } from "@/components/forms";
 import { Workspace } from "@/components/workspace";
@@ -98,6 +102,37 @@ export default async function Page({
             secret={parts[1]}
             email={invitation.email}
             displayName={invitation.displayName}
+          />
+        </div>
+      </div>
+    );
+  }
+  if (parts[0] === "reset-password" && parts.length === 2) {
+    let reset;
+    try {
+      reset = await inspectPasswordReset(parts[1]);
+    } catch {
+      return (
+        <div className="auth-page">
+          <Brand />
+          <div className="auth-card">
+            <h1>Link nicht verfügbar</h1>
+            <p>
+              Dieser Link ist abgelaufen oder wurde bereits verwendet. Bitte
+              frage den Administrator nach einem neuen Link.
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="auth-page">
+        <Brand />
+        <div className="auth-card">
+          <AuthForm
+            mode="reset"
+            secret={parts[1]}
+            displayName={reset.displayName}
           />
         </div>
       </div>

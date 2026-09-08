@@ -25,6 +25,9 @@ import {
   updateUser,
   audit,
   setupOpen,
+  createPasswordReset,
+  inspectPasswordReset,
+  completePasswordReset,
 } from "@/lib/accounts";
 import {
   availableSlots,
@@ -92,6 +95,12 @@ async function handle(req: NextRequest, ctx: Context) {
         const user = await acceptInvitation(secret, data);
         await startSession(user.id);
       } else result = await inspectInvitation(secret);
+    } else if (path.startsWith("reset-password/")) {
+      await rateLimit(`password-reset:${ip}`, post ? 10 : 60);
+      const secret = path.slice("reset-password/".length);
+      result = post
+        ? await completePasswordReset(secret, data)
+        : await inspectPasswordReset(secret);
     } else if (path === "me" && !post) result = await currentUser();
     else {
       const actor = await requireUser();
@@ -283,7 +292,10 @@ async function handle(req: NextRequest, ctx: Context) {
         else if (path === "users" && post)
           result = await createUser(actor, data);
         else if (path === "users/update" && post) await updateUser(actor, data);
-        else if (path === "invitations" && !post)
+        else if (path === "users/password-reset" && post) {
+          await rateLimit(`admin-password-reset:${actor.id}`, 10, 300);
+          result = await createPasswordReset(actor, data);
+        } else if (path === "invitations" && !post)
           result = await db.invitation.findMany({
             select: {
               id: true,

@@ -11,6 +11,9 @@ import {
   revokeInvitation,
   createUser,
   updateUser,
+  createPasswordReset,
+  inspectPasswordReset,
+  completePasswordReset,
 } from "../src/lib/accounts";
 import {
   bookAppointment,
@@ -51,7 +54,7 @@ afterAll(async () => {
 describe.skipIf(!enabled)("PostgreSQL-Integration", () => {
   beforeEach(async () => {
     await db.$executeRawUnsafe(
-      'TRUNCATE "Appointment", "AvailabilityException", "AvailabilityRule", "_AppointmentTypeToProviderProfile", "AppointmentType", "ProviderProfile", "Session", "User", "Invitation", "AuditLog", "AppSettings", "EmailConfiguration", "RateLimit" CASCADE',
+      'TRUNCATE "Appointment", "AvailabilityException", "AvailabilityRule", "_AppointmentTypeToProviderProfile", "AppointmentType", "ProviderProfile", "PasswordResetToken", "Session", "User", "Invitation", "AuditLog", "AppSettings", "EmailConfiguration", "RateLimit" CASCADE',
     );
     delete process.env.SETUP_KEY;
   });
@@ -132,6 +135,44 @@ describe.skipIf(!enabled)("PostgreSQL-Integration", () => {
     expect(await db.auditLog.count({ where: { action: "LOGIN_FAILED" } })).toBe(
       2,
     );
+  });
+  it("setzt ein vergessenes Passwort per Admin-Link einmalig zurück", async () => {
+    const a = await createInitialAdmin(credentials("admin"));
+    const target = await createUser(a, {
+      ...credentials("patient"),
+      role: "USER",
+    });
+    await db.session.create({
+      data: {
+        id: "existing-session",
+        userId: target.id,
+        expiresAt: addDays(new Date(), 1),
+      },
+    });
+    const reset = await createPasswordReset(a, { userId: target.id });
+    const secret = reset.link.split("/").pop()!;
+    expect(await inspectPasswordReset(secret)).toMatchObject({
+      displayName: "patient",
+    });
+    const nextPassword = "A different long password 2026!";
+    await completePasswordReset(secret, {
+      password: nextPassword,
+      passwordConfirm: nextPassword,
+    });
+    await expect(
+      authenticate({ username: "patient", password }),
+    ).rejects.toThrow();
+    await expect(
+      authenticate({ username: "patient", password: nextPassword }),
+    ).resolves.toBe(target.id);
+    expect(await db.session.count({ where: { userId: target.id } })).toBe(0);
+    await expect(inspectPasswordReset(secret)).rejects.toThrow("ungültig");
+    await expect(
+      completePasswordReset(secret, {
+        password: nextPassword,
+        passwordConfirm: nextPassword,
+      }),
+    ).rejects.toThrow("ungültig");
   });
   it("Invite erstellen und einmalig annehmen, nur Hash gespeichert", async () => {
     const a = await createInitialAdmin(credentials("admin"));

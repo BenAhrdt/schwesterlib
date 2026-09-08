@@ -225,3 +225,86 @@ export async function updateUser(actor: Actor, input: unknown) {
     await audit(tx, "USER_ROLE_CHANGED", actor.id, data.id);
   });
 }
+
+export async function createPasswordReset(actor: Actor, input: unknown) {
+  requireRole(actor, ["ADMIN"]);
+  const { userId } = z.object({ userId: z.string() }).parse(input);
+  const secret = token();
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+  await db.$transaction(async (tx) => {
+    const target = await tx.user.findUniqueOrThrow({ where: { id: userId } });
+    if (!target.active)
+      throw new AppError("Das Benutzerkonto ist deaktiviert.");
+    await tx.passwordResetToken.deleteMany({ where: { userId } });
+    await tx.passwordResetToken.create({
+      data: {
+        tokenHash: digest(secret),
+        userId,
+        expiresAt,
+        createdBy: actor.id,
+      },
+    });
+    await audit(tx, "PASSWORD_RESET_CREATED", actor.id, userId);
+  });
+  return {
+    link: `${process.env.APP_URL}/reset-password/${secret}`,
+    expiresAt,
+  };
+}
+
+export async function inspectPasswordReset(secret: string) {
+  const reset = await db.passwordResetToken.findUnique({
+    where: { tokenHash: digest(secret) },
+    include: { user: { select: { displayName: true, active: true } } },
+  });
+  if (
+    !reset ||
+    reset.usedAt ||
+    reset.expiresAt <= new Date() ||
+    !reset.user.active
+  )
+    throw new AppError("Dieser Link ist ungültig oder abgelaufen.", 404);
+  return { displayName: reset.user.displayName, expiresAt: reset.expiresAt };
+}
+
+export async function completePasswordReset(secret: string, input: unknown) {
+  const data = z
+    .object({
+      password: z
+        .string()
+        .min(12, "Das Passwort benötigt mindestens 12 Zeichen.")
+        .max(128),
+      passwordConfirm: z.string(),
+    })
+    .refine((value) => value.password === value.passwordConfirm, {
+      message: "Die Passwörter stimmen nicht überein.",
+      path: ["passwordConfirm"],
+    })
+    .parse(input);
+  const passwordHash = await hashPassword(data.password);
+  return db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${digest(secret)}, 2))`;
+    const reset = await tx.passwordResetToken.findUnique({
+      where: { tokenHash: digest(secret) },
+      include: { user: true },
+    });
+    if (
+      !reset ||
+      reset.usedAt ||
+      reset.expiresAt <= new Date() ||
+      !reset.user.active
+    )
+      throw new AppError("Dieser Link ist ungültig oder abgelaufen.", 404);
+    await tx.user.update({
+      where: { id: reset.userId },
+      data: { passwordHash },
+    });
+    await tx.session.deleteMany({ where: { userId: reset.userId } });
+    await tx.passwordResetToken.update({
+      where: { id: reset.id },
+      data: { usedAt: new Date() },
+    });
+    await audit(tx, "PASSWORD_RESET_COMPLETED", reset.userId, reset.userId);
+    return { username: reset.user.username };
+  });
+}

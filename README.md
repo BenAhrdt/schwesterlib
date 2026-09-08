@@ -1,6 +1,6 @@
 # SchwesterLib
 
-Aktuelle Version: **1.2.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md).
+Aktuelle Version: **1.3.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md).
 
 **Meine Schwester. Mein Termin. Mein Verband.** Eine private, einladungsbasierte Terminplattform mit eigener blau-türkiser Oberfläche, responsiven Dashboards und echter PostgreSQL-Buchungslogik. Keine öffentliche Registrierung und keine medizinischen Behandlungsnotizen.
 
@@ -95,6 +95,12 @@ Zuerst speichern, anschließend **Verbindung testen** oder eine **Testmail** an 
 
 Neue Einladungen mit E-Mail werden bei eingerichteter SMTP-Konfiguration automatisch versendet. Buchung, Verschiebung und Statusänderung erzeugen organisatorische Benachrichtigungen ohne Leistungsdetails. Ein Versandfehler macht eine bereits gespeicherte Buchung nicht rückgängig. `src/lib/mail.ts` bildet die erweiterbare Versandschnittstelle.
 
+## Vergessenes Passwort zurücksetzen
+
+Unter **Administration → Benutzer** kann ein Administrator beim betroffenen aktiven Konto **Passwort zurücksetzen** wählen. Der dort erzeugte Link ist eine Stunde gültig, nur einmal verwendbar und muss über einen geeigneten privaten Kanal an den Benutzer weitergegeben werden. Ein neu erzeugter Link macht vorherige Links für dasselbe Konto ungültig. Der Benutzer legt über den Link selbst ein neues Passwort fest; danach werden sämtliche bisherigen Sitzungen dieses Kontos beendet.
+
+Weder alte noch neue Passwörter sind für Administratoren sichtbar. Reset-Token werden nur gehasht gespeichert. Ein automatischer Versand des Reset-Links erfolgt bewusst nicht, solange keine E-Mail-Verifizierung vorhanden ist.
+
 ## Production
 
 Die konkrete Anleitung für den separaten Debian-13-LXC, Zoraxy, den Umzug von `/root/schwesterlib` nach `/srv/schwesterlib`, systemd, Updates und Backups steht in [docs/PRODUCTION.md](docs/PRODUCTION.md). Bestehende Produktionsdatenbank, Admin und `.env` bleiben erhalten. Entwicklungs- und Browsertests laufen ausschließlich auf `webDev` mit einer separaten Testdatenbank.
@@ -146,7 +152,7 @@ Geprüft werden Setup inklusive Parallelität, Anmeldung und Fehlergleichheit, E
 - **Prisma/PostgreSQL** mit UTC-Zeitpunkten (`timestamptz`); Wochenzeiten in der konfigurierten IANA-Zeitzone, Standard `Europe/Berlin`. Slots im Fünf-Minuten-Raster, mit UTC-Offset zur Unterscheidung doppelter Stunden im Herbst.
 - **Argon2id** (64 MiB, drei Durchläufe), **iron-session** für verschlüsselte Cookies sowie gehashte, widerrufbare Datenbank-Sessions. Als etablierte Session-Bibliothek gewählt; sämtliche Zugangsdatenprüfung bleibt serverseitig.
 - **Serverseitige RBAC** und Eigentumsprüfung in geschützten API-/Domänenfunktionen. Aktuelle Rollen und Aktivstatus werden aus der Datenbank geladen. Rollenwechsel widerrufen Sitzungen; der letzte aktive Administrator bleibt erhalten.
-- **256-Bit-Einladungstoken**, nur SHA-256-Hash persistiert, Ablauf, Widerruf und atomarer Einmalverbrauch. Token und Passwörter stehen nicht im Audit Log.
+- **256-Bit-Einladungs- und Reset-Token**, nur SHA-256-Hash persistiert, Ablauf, Widerruf und atomarer Einmalverbrauch. Token und Passwörter stehen nicht im Audit Log.
 - **Buchungssicherheit**: Provider-Advisory-Lock plus Transaktion für Verfügbarkeit, Buchung, Absage und Verschiebung. Zusätzlich verhindert ein PostgreSQL-GiST-Exclusion-Constraint überlappende aktive Belegungsintervalle inklusive beider Puffer. Ein gescheitertes Verschieben lässt den ursprünglichen Termin bestehen.
 - **Zod**, parametrisierte Queries, React-Output-Encoding, Origin-Prüfung für JSON-Mutationen, Nonce-CSP und Security Headers. Datenbankbasierte atomare Rate Limits für sensible Endpunkte und Benutzermutationen.
 - **Datensparsamkeit**: keine Diagnose-/Behandlungsfelder. Sicherheits- und Verwaltungsaktionen werden mit Aktion, Akteur, Ziel-ID und Zeitpunkt protokolliert.
@@ -167,7 +173,7 @@ Geprüft werden Setup inklusive Parallelität, Anmeldung und Fehlergleichheit, E
 
 ## Bewusste Grenzen
 
-- Kein Passwort-Reset per E-Mail und keine E-Mail-Verifizierung aktiviert. Damit wird insbesondere kein Reset an unverifizierte Adressen angeboten. Angemeldete Benutzer ändern ihr Passwort mit dem bisherigen Passwort.
+- Kein automatischer Passwort-Reset per E-Mail und keine E-Mail-Verifizierung. Administratoren übermitteln manuell erzeugte Reset-Links über einen geeigneten privaten Kanal. Angemeldete Benutzer können ihr Passwort weiterhin mit dem bisherigen Passwort ändern.
 - Keine automatischen Erinnerungen, Versandwarteschlange oder automatischen Wiederholungsversuche; dafür ist die Mail-Schnittstelle vorbereitet.
 - Keine echte SMTP-Zustellung ohne vom Betreiber eingerichteten Mailserver überprüfbar. Die SMTP-Testfunktionen prüfen die konkrete Installation.
 - Listen der Termine sind derzeit auf 2.000 Datensätze begrenzt, das Audit-Fenster auf die letzten 200 Einträge. Für größere Installationen sind Pagination und Archivierung zu ergänzen.

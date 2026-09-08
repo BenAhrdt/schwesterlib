@@ -30,10 +30,10 @@ describe("Web-Updates", () => {
     await rm(directory, { recursive: true, force: true });
   });
   it("erkennt ein neueres veröffentlichtes Release", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(release("v1.3.0")));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(release("v1.4.0")));
     const info = await updateInfo();
-    expect(info.currentVersion).toBe("1.2.0");
-    expect(info.latestVersion).toBe("v1.3.0");
+    expect(info.currentVersion).toBe("1.3.0");
+    expect(info.latestVersion).toBe("v1.4.0");
     expect(info.updateAvailable).toBe(true);
     expect(info.configured).toBe(true);
     expect(info.status.state).toBe("idle");
@@ -41,14 +41,14 @@ describe("Web-Updates", () => {
   it("akzeptiert nur exakt das neueste, wirklich neuere Release", async () => {
     const fetch = vi
       .fn()
-      .mockImplementation(() => Promise.resolve(release("v1.3.0")));
+      .mockImplementation(() => Promise.resolve(release("v1.4.0")));
     vi.stubGlobal("fetch", fetch);
     await expect(requestUpdate("v9.9.9")).rejects.toThrow("steht nicht");
-    await requestUpdate("v1.3.0");
+    await requestUpdate("v1.4.0");
     expect(await readFile(process.env.UPDATE_REQUEST_PATH!, "utf8")).toBe(
-      "v1.3.0\n",
+      "v1.4.0\n",
     );
-    await expect(requestUpdate("v1.3.0")).rejects.toThrow("bereits");
+    await expect(requestUpdate("v1.4.0")).rejects.toThrow("bereits");
   });
   it("lehnt ungültige Release-Metadaten und fehlende Einrichtung ab", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(release("latest")));

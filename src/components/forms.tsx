@@ -36,7 +36,7 @@ export function AuthForm({
   displayName,
   setupKeyRequired,
 }: {
-  mode: "login" | "setup" | "invite";
+  mode: "login" | "setup" | "invite" | "reset";
   secret?: string;
   email?: string | null;
   displayName?: string | null;
@@ -44,6 +44,7 @@ export function AuthForm({
 }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [complete, setComplete] = useState(false);
   const router = useRouter();
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -51,9 +52,17 @@ export function AuthForm({
     setError("");
     try {
       await api(
-        mode === "invite" ? `invite/${secret}` : mode,
+        mode === "invite"
+          ? `invite/${secret}`
+          : mode === "reset"
+            ? `reset-password/${secret}`
+            : mode,
         Object.fromEntries(new FormData(e.currentTarget)),
       );
+      if (mode === "reset") {
+        setComplete(true);
+        return;
+      }
       router.push("/dashboard");
       router.refresh();
     } catch (e) {
@@ -62,6 +71,22 @@ export function AuthForm({
       setBusy(false);
     }
   }
+  if (complete)
+    return (
+      <div className="form-stack">
+        <div className="auth-icon">
+          <LockKeyhole />
+        </div>
+        <h1>Passwort geändert</h1>
+        <p className="alert success">
+          Das neue Passwort ist gespeichert. Alle bisherigen Anmeldungen wurden
+          beendet.
+        </p>
+        <Button asChild>
+          <Link href="/login">Jetzt anmelden</Link>
+        </Button>
+      </div>
+    );
   return (
     <form onSubmit={submit} className="form-stack">
       <div className="auth-icon">
@@ -70,27 +95,33 @@ export function AuthForm({
       <h1>
         {mode === "login"
           ? "Schön, dass du da bist."
-          : mode === "setup"
-            ? "Alles beginnt mit dir."
-            : "Willkommen im Kreis."}
+          : mode === "reset"
+            ? "Neues Passwort vergeben"
+            : mode === "setup"
+              ? "Alles beginnt mit dir."
+              : "Willkommen im Kreis."}
       </h1>
       <p className="muted">
         {mode === "login"
           ? "Melde dich an und plane deinen nächsten Termin."
-          : mode === "setup"
-            ? "Richte SchwesterLib ein und erstelle dein Administratorkonto."
-            : "Du wurdest zu SchwesterLib eingeladen. Erstelle jetzt dein Konto."}
+          : mode === "reset"
+            ? `${displayName ?? "Dein Konto"}: Wähle ein neues, einzigartiges Passwort.`
+            : mode === "setup"
+              ? "Richte SchwesterLib ein und erstelle dein Administratorkonto."
+              : "Du wurdest zu SchwesterLib eingeladen. Erstelle jetzt dein Konto."}
       </p>
-      <Field
-        label="Benutzername"
-        name="username"
-        required
-        minLength={3}
-        maxLength={32}
-        autoComplete="username"
-        pattern="[a-zA-Z0-9_.\-]+"
-      />
-      {mode !== "login" && (
+      {mode !== "reset" && (
+        <Field
+          label="Benutzername"
+          name="username"
+          required
+          minLength={3}
+          maxLength={32}
+          autoComplete="username"
+          pattern="[a-zA-Z0-9_.\-]+"
+        />
+      )}
+      {mode !== "login" && mode !== "reset" && (
         <>
           <Field
             label="Anzeigename"
@@ -157,9 +188,11 @@ export function AuthForm({
           ? "Einen Moment …"
           : mode === "login"
             ? "Anmelden"
-            : mode === "setup"
-              ? "SchwesterLib einrichten"
-              : "Konto erstellen"}
+            : mode === "reset"
+              ? "Passwort speichern"
+              : mode === "setup"
+                ? "SchwesterLib einrichten"
+                : "Konto erstellen"}
         <ArrowRight size={17} />
       </Button>
       {mode === "login" && (
