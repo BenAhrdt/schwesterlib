@@ -90,6 +90,7 @@ export async function createInvitation(actor: Actor, input: unknown) {
         expiresAt: new Date(data.expiresAt),
         tokenHash: digest(secret),
         createdBy: actor.id,
+        ...(data.role === "PROVIDER" ? { provider: { create: {} } } : {}),
       },
     });
     await audit(tx, "INVITATION_CREATED", actor.id, result.id);
@@ -116,6 +117,7 @@ export async function acceptInvitation(secret: string, input: unknown) {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${digest(secret)}, 1))`;
     const invite = await tx.invitation.findUnique({
       where: { tokenHash: digest(secret) },
+      include: { provider: true },
     });
     if (!invite || invite.status !== "OPEN" || invite.expiresAt <= new Date())
       throw new AppError("Diese Einladung ist ungültig oder abgelaufen.", 404);
@@ -134,12 +136,23 @@ export async function acceptInvitation(secret: string, input: unknown) {
         email: invite.email ?? data.email,
         passwordHash,
         role: invite.role,
-        ...(invite.role === "PROVIDER" ? { provider: { create: {} } } : {}),
+        ...(invite.role === "PROVIDER" && !invite.provider
+          ? { provider: { create: {} } }
+          : {}),
       },
       select: publicUser,
     });
+    if (invite.provider) {
+      await tx.providerProfile.update({
+        where: { id: invite.provider.id },
+        data: { invitationId: null, userId: user.id },
+      });
+    }
     await audit(tx, "USER_CREATED", user.id, user.id);
-    return user;
+    return tx.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: publicUser,
+    });
   });
 }
 export async function revokeInvitation(actor: Actor, id: string) {

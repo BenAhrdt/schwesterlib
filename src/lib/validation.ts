@@ -57,6 +57,8 @@ export const profileSchema = z.object({
 });
 export const providerSchema = z.object({
   id: z.string(),
+  draftDisplayName: z.string().trim().min(2).max(80).optional(),
+  emailNotifications: z.boolean().optional(),
   specialty: z.string().max(160),
   description: z.string().max(1000),
   location: z.string().max(160),

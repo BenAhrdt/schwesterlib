@@ -1,0 +1,32 @@
+[Unit]
+Description=SchwesterLib production application
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=schwesterlib
+Group=schwesterlib
+WorkingDirectory=/srv/schwesterlib
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+# Next.js and the readiness script load the existing .env themselves.
+ExecStartPre=/usr/bin/node scripts/wait-for-database.mjs
+ExecStart=/usr/bin/node node_modules/next/dist/bin/next start --hostname 0.0.0.0 --port 3000
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=100
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/srv/schwesterlib/.next
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=schwesterlib
+
+[Install]
+WantedBy=multi-user.target

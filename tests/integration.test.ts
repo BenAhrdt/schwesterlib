@@ -18,6 +18,7 @@ import {
   changeAppointmentStatus,
   saveRules,
   addException,
+  saveProvider,
 } from "../src/lib/scheduling";
 import { type Actor, requireRole } from "../src/lib/auth";
 import { digest, rateLimit } from "../src/lib/security";
@@ -343,6 +344,102 @@ describe.skipIf(!enabled)("PostgreSQL-Integration", () => {
       expect(slots.some((s) => s.label === "02:00 +02:00")).toBe(true);
       expect(slots.some((s) => s.label === "02:00 +01:00")).toBe(true);
       expect(new Set(slots.map((s) => s.startsAt)).size).toBe(slots.length);
+    }
+  });
+  it("bereitet Behandlerentwürfe vor und übernimmt sie bei einmaliger Annahme", async () => {
+    await fixture();
+    const invitation = await createInvitation(admin, {
+      role: "PROVIDER",
+      displayName: "Neue Schwester",
+      email: "",
+      expiresAt: addDays(new Date(), 5).toISOString(),
+    });
+    const draft = await db.providerProfile.findUniqueOrThrow({
+      where: { invitationId: invitation.invitation.id },
+    });
+    expect(draft.userId).toBeNull();
+    await saveProvider(admin, {
+      ...draft,
+      draftDisplayName: "Schwester Mia",
+      location: "Vorbereiteter Standort",
+      emailNotifications: true,
+    });
+    await expect(
+      saveProvider(provider, { ...draft, location: "Fremder Zugriff" }),
+    ).rejects.toThrow("Berechtigung");
+    await expect(saveProvider(user, { ...draft })).rejects.toThrow(
+      "Berechtigung",
+    );
+    await db.appointmentType.update({
+      where: { id: typeId },
+      data: { providers: { connect: { id: draft.id } } },
+    });
+    await saveRules(admin, {
+      providerId: draft.id,
+      rules: [
+        {
+          weekday: new Date(`${date}T12:00:00Z`).getUTCDay(),
+          startMinute: 1020,
+          endMinute: 1200,
+        },
+      ],
+    });
+    expect(await availableSlots(draft.id, typeId, date)).toEqual([]);
+    await expect(
+      bookAppointment(user, { providerId: draft.id, typeId, startsAt }),
+    ).rejects.toThrow();
+    const secret = invitation.link.split("/").pop()!;
+    const accepted = await Promise.allSettled([
+      acceptInvitation(secret, credentials("mia")),
+      acceptInvitation(secret, credentials("mia2")),
+    ]);
+    expect(
+      accepted.filter((entry) => entry.status === "fulfilled"),
+    ).toHaveLength(1);
+    const result = await db.providerProfile.findUniqueOrThrow({
+      where: { id: draft.id },
+      include: { rules: true, types: true },
+    });
+    expect(result.userId).not.toBeNull();
+    expect(result.invitationId).toBeNull();
+    expect(result.location).toBe("Vorbereiteter Standort");
+    expect(result.emailNotifications).toBe(true);
+    expect(result.rules).toHaveLength(1);
+    expect(result.types.map((entry) => entry.id)).toContain(typeId);
+    expect(
+      (await availableSlots(draft.id, typeId, date)).length,
+    ).toBeGreaterThan(0);
+  });
+  it("widerrufene und abgelaufene Behandlerentwürfe bleiben unbuchbar", async () => {
+    await fixture();
+    for (const revoked of [true, false]) {
+      const invitation = await createInvitation(admin, {
+        role: "PROVIDER",
+        expiresAt: addDays(new Date(), 2).toISOString(),
+      });
+      const draft = await db.providerProfile.findUniqueOrThrow({
+        where: { invitationId: invitation.invitation.id },
+      });
+      if (revoked) await revokeInvitation(admin, invitation.invitation.id);
+      else
+        await db.invitation.update({
+          where: { id: invitation.invitation.id },
+          data: { expiresAt: new Date(0) },
+        });
+      expect(await availableSlots(draft.id, typeId, date)).toEqual([]);
+      await expect(
+        acceptInvitation(
+          invitation.link.split("/").pop()!,
+          credentials("blocked"),
+        ),
+      ).rejects.toThrow();
+      expect(
+        (
+          await db.providerProfile.findUniqueOrThrow({
+            where: { id: draft.id },
+          })
+        ).userId,
+      ).toBeNull();
     }
   });
   it("Rate Limit zählt parallele Requests atomar", async () => {

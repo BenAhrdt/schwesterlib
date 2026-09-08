@@ -1,0 +1,34 @@
+# Changelog
+
+Alle wesentlichen Änderungen an SchwesterLib werden in dieser Datei dokumentiert.
+
+## [1.1.0] – 2026-09-08
+
+### Neu
+
+- Behandlerprofile können bereits mit einer offenen Einladung vorbereitet werden. Leistungen und Verfügbarkeiten bleiben bei der späteren Kontoaktivierung erhalten.
+- Optionale E-Mail-Benachrichtigungen für Behandler bei Buchung, Verschiebung und Absage.
+- Datenbankmigration für Behandlerentwürfe und Benachrichtigungseinstellungen; bestehende Konten, Termine und die Setup-Sperre bleiben erhalten.
+- Gesundheitsendpunkt für Anwendung und Datenbank unter `/api/health`.
+- systemd-Dienst für den Betrieb unter einem eigenen Benutzer sowie abgesicherte Scripts für Produktionsupdates und PostgreSQL-Backups.
+- Ausführliche Anleitung für Installation, Updates, Reverse Proxy, Backups und Recovery auf dem Produktions-LXC.
+
+### Behoben
+
+- Auswahlfelder besitzen eindeutig zugeordnete Beschriftungen für Browser und assistive Technik.
+- Dekorative Elemente verursachen auf schmalen Mobilgeräten keinen horizontalen Überlauf mehr.
+- Browserprüfungen verwenden eindeutige Selektoren für Loginfehler und Terminarten.
+
+### Betriebshinweise
+
+- Vor dem Update der Produktionsinstallation ein Datenbankbackup erstellen.
+- Beim Update `npm run db:migrate` ausführen; `npm run db:seed` gehört nicht zum Update.
+- Die neue E-Mail-Option ist für bestehende und neue Behandler zunächst ausgeschaltet.
+- Pushnachrichten und eine Updatefunktion innerhalb der Weboberfläche sind noch nicht enthalten.
+
+## [1.0.0] – 2026-09-08
+
+- Erste vollständige Version mit geschlossenem Einladungssystem, Rollen, Terminverwaltung, Verfügbarkeiten, Kalender, SMTP-Konfiguration und abgesichertem Initial-Setup.
+
+[1.1.0]: https://github.com/BenAhrdt/schwesterlib/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/BenAhrdt/schwesterlib/releases/tag/v1.0.0

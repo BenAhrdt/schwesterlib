@@ -6,7 +6,12 @@ import type { Prisma, Appointment } from "@/generated/prisma/client";
 import { AppError } from "./security";
 import { type Actor, requireRole } from "./auth";
 import { audit } from "./accounts";
-import { bookingSchema, exceptionSchema, rulesSchema } from "./validation";
+import {
+  bookingSchema,
+  exceptionSchema,
+  rulesSchema,
+  providerSchema,
+} from "./validation";
 export const activeStatuses = ["PENDING", "CONFIRMED"] as const;
 export const overlap = (a: Date, b: Date, c: Date, d: Date) => a < d && b > c;
 export async function providerAccess(
@@ -22,6 +27,25 @@ export async function providerAccess(
 }
 export const lockProvider = (tx: Prisma.TransactionClient, id: string) =>
   tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${id}, 2))`;
+export async function saveProvider(actor: Actor, input: unknown) {
+  const { id, draftDisplayName, ...values } = providerSchema.parse(input);
+  await db.$transaction(async (tx) => {
+    await lockProvider(tx, id);
+    const provider = await providerAccess(tx, actor, id);
+    if (draftDisplayName !== undefined) {
+      if (!provider.invitationId)
+        throw new AppError(
+          "Das Konto ist bereits angelegt. Bitte das Benutzerprofil bearbeiten.",
+        );
+      await tx.invitation.update({
+        where: { id: provider.invitationId },
+        data: { displayName: draftDisplayName },
+      });
+    }
+    await tx.providerProfile.update({ where: { id }, data: values });
+    await audit(tx, "PROVIDER_CHANGED", actor.id, id);
+  });
+}
 export async function availableSlots(
   providerId: string,
   typeId: string,
@@ -45,7 +69,7 @@ export async function availableSlots(
   });
   if (
     !provider?.active ||
-    !provider.user.active ||
+    !provider.user?.active ||
     provider.user.role !== "PROVIDER" ||
     !provider.types[0]
   )

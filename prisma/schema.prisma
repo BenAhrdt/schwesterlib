@@ -46,8 +46,11 @@ model Session {
 }
 model ProviderProfile {
   id String @id @default(cuid())
-  userId String @unique
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  userId String? @unique
+  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
+  invitationId String? @unique
+  invitation Invitation? @relation(fields: [invitationId], references: [id], onDelete: Restrict)
+  emailNotifications Boolean @default(false)
   specialty String @default("Professioneller Verbandswechsel & Geschwistermedizin")
   description String @default("")
   location String @default("Zu Hause")
@@ -118,6 +121,7 @@ model Invitation {
   expiresAt DateTime @db.Timestamptz(3)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   createdBy String
+  provider ProviderProfile?
   @@index([status, expiresAt])
 }
 model EmailConfiguration {

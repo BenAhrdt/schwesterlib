@@ -65,17 +65,37 @@ export async function sendMail(to: string, subject: string, text: string) {
 }
 export async function appointmentMail(
   id: string,
-  event: "gebucht" | "verschoben" | "aktualisiert",
+  event: "gebucht" | "verschoben" | "abgesagt" | "aktualisiert",
 ) {
   const a = await db.appointment.findUnique({
     where: { id },
     include: { user: true, provider: { include: { user: true } } },
   });
-  if (!a?.user.email || !(await db.emailConfiguration.count())) return;
+  if (!a || !(await db.emailConfiguration.count())) return;
   // Keep organizational details in the authenticated app, not in email.
-  await sendMail(
-    a.user.email,
-    `SchwesterLib · Termin ${event}`,
-    `Ihr Termin wurde ${event}. Die aktuellen Details finden Sie unter ${process.env.APP_URL}/appointments.`,
+  const recipients = new Set<string>();
+  if (a.user.email) recipients.add(a.user.email);
+  if (
+    event !== "aktualisiert" &&
+    a.provider.emailNotifications &&
+    a.provider.user?.active &&
+    a.provider.user.role === "PROVIDER" &&
+    a.provider.user.email
+  ) {
+    recipients.add(a.provider.user.email);
+  }
+  const deliveries = await Promise.allSettled(
+    [...recipients].map((email) =>
+      sendMail(
+        email,
+        `SchwesterLib · Termin ${event}`,
+        `Ein Termin wurde ${event}. Die aktuellen Details finden Sie nach der Anmeldung unter ${process.env.APP_URL}/dashboard.`,
+      ),
+    ),
   );
+  if (deliveries.some((delivery) => delivery.status === "rejected")) {
+    throw new AppError(
+      "Mindestens eine Terminbenachrichtigung konnte nicht versendet werden.",
+    );
+  }
 }

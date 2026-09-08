@@ -53,7 +53,9 @@ type Type = {
 };
 type Provider = {
   id: string;
-  user: { displayName: string };
+  user: { displayName: string; email?: string | null };
+  invitation?: { status: string; expiresAt: string } | null;
+  emailNotifications?: boolean;
   specialty: string;
   description: string;
   location: string;
@@ -137,7 +139,9 @@ function Select({
   return (
     <label className="field">
       <span id={labelId}>{label}</span>
-      <select aria-labelledby={labelId} {...props}>{children}</select>
+      <select aria-labelledby={labelId} {...props}>
+        {children}
+      </select>
     </label>
   );
 }
@@ -1433,6 +1437,18 @@ function Providers({ availability }: { availability: boolean }) {
         data.map((p) => (
           <section className="panel" key={p.id}>
             <h2>{p.user.displayName}</h2>
+            {p.invitation && (
+              <p className="alert" role="status">
+                {p.invitation.status === "REVOKED"
+                  ? "Einladung widerrufen"
+                  : new Date(p.invitation.expiresAt) <= new Date()
+                    ? "Einladung abgelaufen"
+                    : "Einladung ausstehend"}
+                {
+                  " · Noch nicht buchbar. Profil, Leistungen und Verfügbarkeit können vorbereitet werden."
+                }
+              </p>
+            )}
             {!availability && (
               <details className="detail-item" open>
                 <summary>Behandlerprofil</summary>
@@ -1442,10 +1458,21 @@ function Providers({ availability }: { availability: boolean }) {
                     ...d,
                     id: p.id,
                     active: d.active === "on",
+                    emailNotifications: d.emailNotifications === "on",
                   })}
                   onSuccess={refresh}
                 >
                   <div className="form-grid">
+                    {p.invitation && (
+                      <Field
+                        label="Anzeigename des Behandlerentwurfs"
+                        name="draftDisplayName"
+                        defaultValue={p.user.displayName}
+                        required
+                        minLength={2}
+                        maxLength={80}
+                      />
+                    )}
                     <Field
                       label="Fachgebiet"
                       name="specialty"
@@ -1485,8 +1512,26 @@ function Providers({ availability }: { availability: boolean }) {
                       name="active"
                       defaultChecked={p.active}
                     />
-                    Behandler buchbar
+                    {p.invitation
+                      ? "Nach Einladungsannahme buchbar"
+                      : "Behandler buchbar"}
                   </label>
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      name="emailNotifications"
+                      defaultChecked={p.emailNotifications}
+                    />
+                    E-Mail bei Buchung, Verschiebung und Absage
+                  </label>
+                  <p className="muted">
+                    {p.user.email
+                      ? `Empfänger: ${p.user.email}.`
+                      : "Noch keine E-Mail-Adresse hinterlegt. Bitte im Benutzerprofil ergänzen; bei Entwürfen kann sie bei der Einladungsannahme angegeben werden."}
+                    {
+                      " Der Versand benötigt eingerichtetes SMTP und ein angenommenes Konto."
+                    }
+                  </p>
                 </ActionForm>
               </details>
             )}

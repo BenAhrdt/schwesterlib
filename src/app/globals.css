@@ -204,6 +204,8 @@ button {
   color: #627a7b;
 }
 .hero {
+  /* Keep rotated decorative orbits inside the hero on narrow screens. */
+  overflow: clip;
   max-width: 1240px;
   margin: auto;
   padding: 72px 36px 86px;

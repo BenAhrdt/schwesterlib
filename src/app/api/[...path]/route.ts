@@ -33,10 +33,9 @@ import {
   saveRules,
   addException,
   removeException,
-  providerAccess,
-  lockProvider,
+  saveProvider,
 } from "@/lib/scheduling";
-import { profileSchema, providerSchema, typeSchema } from "@/lib/validation";
+import { profileSchema, typeSchema } from "@/lib/validation";
 import { appointmentMail, saveSmtp, sendMail, smtpAction } from "@/lib/mail";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -148,7 +147,10 @@ async function handle(req: NextRequest, ctx: Context) {
         const a = await changeAppointmentStatus(actor, data);
         result = { appointment: a, mailSent: true };
         try {
-          await appointmentMail(a.id, "aktualisiert");
+          await appointmentMail(
+            a.id,
+            a.status === "CANCELLED" ? "abgesagt" : "aktualisiert",
+          );
         } catch {
           result = { appointment: a, mailSent: false };
         }
@@ -187,23 +189,33 @@ async function handle(req: NextRequest, ctx: Context) {
         await startSession(actor.id);
       } else if (path === "providers" && !post) {
         await requireUser(["ADMIN", "PROVIDER"]);
-        result = await db.providerProfile.findMany({
+        const providers = await db.providerProfile.findMany({
           where: actor.role === "ADMIN" ? {} : { userId: actor.id },
           include: {
-            user: { select: { displayName: true } },
+            user: { select: { displayName: true, email: true } },
+            invitation: {
+              select: {
+                displayName: true,
+                email: true,
+                status: true,
+                expiresAt: true,
+              },
+            },
             rules: true,
             exceptions: true,
             types: true,
           },
         });
+        result = providers.map(({ invitation, ...provider }) => ({
+          ...provider,
+          user: provider.user ?? {
+            displayName: invitation?.displayName || "Behandlerentwurf",
+            email: invitation?.email ?? null,
+          },
+          invitation: provider.user ? null : invitation,
+        }));
       } else if (path === "providers" && post) {
-        const { id, ...values } = providerSchema.parse(data);
-        await db.$transaction(async (tx) => {
-          await providerAccess(tx, actor, id);
-          await lockProvider(tx, id);
-          await tx.providerProfile.update({ where: { id }, data: values });
-          await audit(tx, "PROVIDER_CHANGED", actor.id, id);
-        });
+        await saveProvider(actor, data);
       } else if (path === "availability" && post) await saveRules(actor, data);
       else if (path === "exceptions" && post)
         result = await addException(actor, data);

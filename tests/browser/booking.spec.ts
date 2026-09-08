@@ -74,6 +74,19 @@ test("Setup, Einladung, mobile Buchung, Verschieben, Absage und API-Rechte", asy
   });
   await expect(invite).toBeVisible();
   const link = await invite.inputValue();
+  await page.goto("/admin/providers");
+  await expect(page.getByText(/Einladung ausstehend/)).toBeVisible();
+  await page
+    .getByLabel("Standort", { exact: true })
+    .fill("Vorbereiteter Behandlungsort");
+  await page.getByLabel("E-Mail bei Buchung, Verschiebung und Absage").check();
+  await page.getByRole("button", { name: "Speichern", exact: true }).click();
+  await expect(
+    page.getByText("Erfolgreich gespeichert.", { exact: true }),
+  ).toBeVisible();
+  const draftProfiles = await (await page.request.get("/api/providers")).json();
+  const draftId = draftProfiles[0].id;
+  expect(await (await page.request.get("/api/catalog")).json()).toEqual([]);
   const providerContext = await browser.newContext({
     baseURL: "http://localhost:3100",
   });
@@ -95,6 +108,10 @@ test("Setup, Einladung, mobile Buchung, Verschieben, Absage und API-Rechte", asy
   ).toBe(403);
   const providers = await (await page.request.get("/api/providers")).json();
   const providerId = providers[0].id;
+  expect(providerId).toBe(draftId);
+  expect(providers[0].location).toBe("Vorbereiteter Behandlungsort");
+  expect(providers[0].emailNotifications).toBe(true);
+  expect(providers[0].invitation).toBeNull();
   await post(page.request, "types", {
     name: "Verbandswechsel",
     duration: 15,
@@ -136,7 +153,7 @@ test("Setup, Einladung, mobile Buchung, Verschieben, Absage und API-Rechte", asy
   await patient.getByLabel("Benutzername", { exact: true }).fill("patient");
   await patient.getByLabel("Passwort", { exact: true }).fill("wrong-password");
   await patient.getByRole("button", { name: "Anmelden", exact: true }).click();
-  await expect(patient.getByRole("alert")).toContainText(
+  await expect(patient.locator("form").getByRole("alert")).toContainText(
     "Benutzername oder Passwort ist falsch",
   );
   await patient.getByLabel("Passwort", { exact: true }).fill(password);
@@ -146,7 +163,7 @@ test("Setup, Einladung, mobile Buchung, Verschieben, Absage und API-Rechte", asy
   expect((await patientContext.request.get("/api/smtp")).status()).toBe(403);
   await patient.goto("/book");
   await patient.getByRole("button", { name: /Schwester Anna/ }).click();
-  await patient.getByRole("button", { name: /Verbandswechsel/ }).click();
+  await patient.getByRole("button", { name: /^Verbandswechsel/ }).click();
   await patient.getByLabel(/Datum · Zeitzone/).fill(date);
   await patient.locator(".slots button").first().click();
   await patient

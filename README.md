@@ -1,5 +1,7 @@
 # SchwesterLib
 
+Aktuelle Version: **1.1.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md).
+
 **Meine Schwester. Mein Termin. Mein Verband.** Eine private, einladungsbasierte Terminplattform mit eigener blau-türkiser Oberfläche, responsiven Dashboards und echter PostgreSQL-Buchungslogik. Keine öffentliche Registrierung und keine medizinischen Behandlungsnotizen.
 
 ## Voraussetzungen
@@ -73,6 +75,18 @@ Es gibt keine vordefinierten Konten oder Passwörter. Zwei parallele Setup-Aufru
 
 Unter **Meine Termine** stehen Details, Verschieben und Absagen bereit. Behandler verwalten ihre Termine im Kalender; Administratoren sehen alle Termine. Die Tages-, Wochen- und Monatsansicht ist anklickbar. Aktive Buchungen sind standardmäßig bestätigt. Der Status `PENDING` und dessen Bestätigung sind ebenfalls unterstützt; abgeschlossene/abgesagte Termine können nicht reaktiviert werden.
 
+## Behandlerentwürfe und Benachrichtigungen
+
+### Behandler vor der Einladungsannahme vorbereiten
+
+Eine Einladung mit Rolle **Behandler** legt sofort einen Entwurf unter **Administration → Behandler** an. Dort lassen sich Anzeigename, Profil, Leistungen und Verfügbarkeiten vorbereiten. „Einladung ausstehend“, „abgelaufen“ oder „widerrufen“ kennzeichnet den Zustand. Entwürfe erscheinen nicht im Buchungskatalog und sind auch über direkte Buchungsanfragen nicht buchbar. Bei Annahme wird das vorhandene Profil mit dem neuen Konto verbunden; vorbereitete Leistungen und Zeiten bleiben erhalten. Die an eine Einladung gebundene E-Mail-Adresse wird dadurch nicht geändert. Abgelaufene oder widerrufene Entwürfe bleiben zur Einsicht erhalten; eine neue Einladung erzeugt einen neuen Entwurf.
+
+Die Migration `202609080002_provider_drafts_notifications` ergänzt Entwürfe auch für bereits vorhandene offene Behandlereinladungen. Vor dem produktiven Update ein Backup erstellen und `npm run db:migrate` ausführen. Bestehende Konten, Termine und die Setup-Sperre bleiben erhalten.
+
+### Termin-E-Mails für Behandler
+
+Im **Behandlerprofil** aktiviert der Behandler selbst oder ein Administrator „E-Mail bei Buchung, Verschiebung und Absage“. Der Schalter ist standardmäßig aus. Versand benötigt SMTP, ein angenommenes aktives Konto und dessen E-Mail-Adresse; diese wird unter **Mein Profil** bzw. in der Benutzerverwaltung gepflegt. Auch wenn der buchende Benutzer keine E-Mail hat, erhält der Behandler seine Nachricht. Beide Empfänger werden getrennt angeschrieben; ein Fehler bei einem Empfänger verhindert den Versuch an den anderen nicht. Die Nachricht enthält nur den Anlass und einen Link zum Dashboard, keine Leistungs- oder Patientendetails. Buchung und Absage bleiben bei Versandfehlern gespeichert. Keine automatische Wiederholung; Pushnachrichten sind noch nicht implementiert.
+
 ## SMTP
 
 Unter **Einstellungen → E-Mail / SMTP** Host, Port, TLS-Modus, Benutzername, Passwort und Absender konfigurieren. Port 465 nutzt implizites TLS; andere Ports verwenden verpflichtendes STARTTLS. Selbstsignierte Zertifikate werden abgewiesen. Ohne SMTP funktioniert die gesamte Termin- und Einladungsverwaltung.
@@ -82,6 +96,8 @@ Zuerst speichern, anschließend **Verbindung testen** oder eine **Testmail** an 
 Neue Einladungen mit E-Mail werden bei eingerichteter SMTP-Konfiguration automatisch versendet. Buchung, Verschiebung und Statusänderung erzeugen organisatorische Benachrichtigungen ohne Leistungsdetails. Ein Versandfehler macht eine bereits gespeicherte Buchung nicht rückgängig. `src/lib/mail.ts` bildet die erweiterbare Versandschnittstelle.
 
 ## Production
+
+Die konkrete Anleitung für den separaten Debian-13-LXC, Zoraxy, den Umzug von `/root/schwesterlib` nach `/srv/schwesterlib`, systemd, Updates und Backups steht in [docs/PRODUCTION.md](docs/PRODUCTION.md). Bestehende Produktionsdatenbank, Admin und `.env` bleiben erhalten. Entwicklungs- und Browsertests laufen ausschließlich auf `webDev` mit einer separaten Testdatenbank.
 
 ```bash
 npm ci
