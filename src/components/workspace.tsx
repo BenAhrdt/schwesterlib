@@ -2168,6 +2168,7 @@ type UpdateInfo = {
     version?: string;
   };
 };
+type LocalUpdateStatus = Pick<UpdateInfo, "currentVersion" | "status">;
 function UpdatePanel() {
   const [info, setInfo] = useState<UpdateInfo>(),
     [error, setError] = useState(""),
@@ -2175,6 +2176,45 @@ function UpdatePanel() {
     [installing, setInstalling] = useState(false);
   const initiated = useRef(false);
   const waitingForRestart = useRef(false);
+  const targetVersion = useRef<string | undefined>(undefined);
+  const checkStatus = useCallback(async () => {
+    try {
+      const next = await api<LocalUpdateStatus>("updates/status");
+      setInfo((current) =>
+        current
+          ? { ...current, currentVersion: next.currentVersion, status: next.status }
+          : current,
+      );
+      setError("");
+      const matchesTarget =
+        !targetVersion.current || next.status.version === targetVersion.current;
+      if (
+        (["requested", "running"].includes(next.status.state) &&
+          matchesTarget) ||
+        (initiated.current && !matchesTarget)
+      ) {
+        setInstalling(true);
+        waitingForRestart.current = true;
+      } else {
+        waitingForRestart.current = false;
+      }
+      if (next.status.state === "failed" && matchesTarget)
+        setInstalling(false);
+      if (
+        next.status.state === "success" &&
+        initiated.current &&
+        matchesTarget
+      ) {
+        initiated.current = false;
+        window.setTimeout(() => window.location.reload(), 1200);
+      }
+    } catch (cause) {
+      if (!initiated.current && !waitingForRestart.current)
+        setError((cause as Error).message);
+    } finally {
+      setChecking(false);
+    }
+  }, []);
   const check = useCallback(async () => {
     try {
       const next = await api<UpdateInfo>("updates");
@@ -2201,14 +2241,14 @@ function UpdatePanel() {
   useEffect(() => {
     const initial = window.setTimeout(() => void check(), 0);
     const timer = window.setInterval(
-      () => void check(),
+      () => void (installing ? checkStatus() : check()),
       installing ? 2000 : 300000,
     );
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(timer);
     };
-  }, [check, installing]);
+  }, [check, checkStatus, installing]);
   async function install() {
     if (
       !info ||
@@ -2219,13 +2259,14 @@ function UpdatePanel() {
       return;
     initiated.current = true;
     waitingForRestart.current = true;
+    targetVersion.current = info.latestVersion;
     setInstalling(true);
     setError("");
     try {
       await api("updates", { version: info.latestVersion });
     } catch (cause) {
       // The application can disconnect immediately after accepting the request.
-      window.setTimeout(() => void check(), 1500);
+      window.setTimeout(() => void checkStatus(), 1500);
       if (!(cause instanceof ApiUnavailableError) && !(cause instanceof TypeError)) {
         initiated.current = false;
         waitingForRestart.current = false;

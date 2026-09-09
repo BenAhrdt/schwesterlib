@@ -1,6 +1,6 @@
 # SchwesterLib
 
-Aktuelle Version: **1.4.1** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md).
+Aktuelle Version: **1.4.2** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md).
 
 **Meine Schwester. Mein Termin. Mein Verband.** Eine private, einladungsbasierte Terminplattform mit eigener blau-türkiser Oberfläche, responsiven Dashboards und echter PostgreSQL-Buchungslogik. Keine öffentliche Registrierung und keine medizinischen Behandlungsnotizen.
 

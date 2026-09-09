@@ -49,7 +49,7 @@ import {
   setPushReminders,
   testPush,
 } from "@/lib/push";
-import { requestUpdate, updateInfo } from "@/lib/updates";
+import { requestUpdate, updateInfo, updateStatus } from "@/lib/updates";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ path: string[] }> };
@@ -407,7 +407,9 @@ async function handle(req: NextRequest, ctx: Context) {
             await tx.appSettings.update({ where: { id: 1 }, data: values });
             await audit(tx, "SETTINGS_CHANGED", actor.id);
           });
-        } else if (path === "updates" && !post) result = await updateInfo();
+        } else if (path === "updates/status" && !post)
+          result = await updateStatus();
+        else if (path === "updates" && !post) result = await updateInfo();
         else if (path === "updates" && post) {
           await rateLimit(`update:${actor.id}`, 3, 300);
           const { version } = z

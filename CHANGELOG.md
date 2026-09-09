@@ -2,6 +2,13 @@
 
 Alle wesentlichen Änderungen an SchwesterLib werden in dieser Datei dokumentiert.
 
+## [1.4.2] – 2026-09-09
+
+### Behoben
+
+- Die Updateanzeige fragt während Installation und Neustart nur noch den lokalen Status ab. Dadurch wird das anonyme GitHub-API-Limit nicht mehr durch die zweisekündliche Fortschrittsabfrage ausgeschöpft.
+- Ein Status eines vorherigen Updates kann keinen vorzeitigen Seitenneustart mehr auslösen.
+
 ## [1.4.1] – 2026-09-09
 
 ### Behoben
@@ -73,6 +80,7 @@ Alle wesentlichen Änderungen an SchwesterLib werden in dieser Datei dokumentier
 
 - Erste vollständige Version mit geschlossenem Einladungssystem, Rollen, Terminverwaltung, Verfügbarkeiten, Kalender, SMTP-Konfiguration und abgesichertem Initial-Setup.
 
+[1.4.2]: https://github.com/BenAhrdt/schwesterlib/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/BenAhrdt/schwesterlib/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/BenAhrdt/schwesterlib/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/BenAhrdt/schwesterlib/compare/v1.2.0...v1.3.0

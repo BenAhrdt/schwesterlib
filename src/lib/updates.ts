@@ -95,6 +95,13 @@ async function deploymentStatus(): Promise<UpdateStatus> {
   }
 }
 
+export async function updateStatus() {
+  return {
+    currentVersion: packageJson.version,
+    status: await deploymentStatus(),
+  };
+}
+
 export async function updateInfo() {
   const [release, status] = await Promise.all([
     latestRelease(),
