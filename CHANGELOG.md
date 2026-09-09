@@ -2,6 +2,19 @@
 
 Alle wesentlichen Änderungen an SchwesterLib werden in dieser Datei dokumentiert.
 
+## [1.4.0] – 2026-09-09
+
+### Neu
+
+- Freiwillige Push-Benachrichtigungen bei Buchungen, Verschiebungen und Absagen für Patienten und Behandler; unabhängig von E-Mail.
+- Eigene Benachrichtigungseinstellungen mit nachträglicher Aktivierung, Anleitung bei blockierter Berechtigung, Testnachricht und Deaktivierung pro Gerät.
+- Optionale Erinnerungen an eigene Termine, automatischer Erinnerungsprozess sowie Unterstützung für die Installation auf dem Home-Bildschirm.
+- Dauerhafte Gerätezuordnung und verschlüsselte Push-Schlüssel; Entfernung der Zuordnung beim Abmelden und Bereinigung abgelaufener Abonnements.
+
+### Behoben
+
+- Behandler sehen bei Terminarten keine Auswahl anderer Behandler mehr. Eigene Terminarten werden automatisch dem eigenen Profil zugeordnet; gemeinsame Terminarten bleiben für Behandler schreibgeschützt.
+
 ## [1.3.0] – 2026-09-08
 
 ### Neu
@@ -54,6 +67,7 @@ Alle wesentlichen Änderungen an SchwesterLib werden in dieser Datei dokumentier
 
 - Erste vollständige Version mit geschlossenem Einladungssystem, Rollen, Terminverwaltung, Verfügbarkeiten, Kalender, SMTP-Konfiguration und abgesichertem Initial-Setup.
 
+[1.4.0]: https://github.com/BenAhrdt/schwesterlib/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/BenAhrdt/schwesterlib/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/BenAhrdt/schwesterlib/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/BenAhrdt/schwesterlib/compare/v1.0.0...v1.1.0

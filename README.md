@@ -1,6 +1,6 @@
 # SchwesterLib
 
-Aktuelle Version: **1.3.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md).
+Aktuelle Version: **1.4.0** · Änderungen siehe [CHANGELOG.md](CHANGELOG.md).
 
 **Meine Schwester. Mein Termin. Mein Verband.** Eine private, einladungsbasierte Terminplattform mit eigener blau-türkiser Oberfläche, responsiven Dashboards und echter PostgreSQL-Buchungslogik. Keine öffentliche Registrierung und keine medizinischen Behandlungsnotizen.
 
@@ -47,12 +47,29 @@ Ohne Docker eine eigene PostgreSQL-Datenbank und einen Benutzer anlegen und `DAT
 | `POSTGRES_PASSWORD` | Passwort des PostgreSQL-Benutzers im Docker-Compose-Container                            |
 | `APP_URL`           | Exakte öffentliche URL ohne abschließenden Slash; für CSRF-Prüfung und Einladungslinks   |
 | `SESSION_SECRET`    | Unabhängiges zufälliges Secret, mindestens 32 Zeichen                                    |
-| `ENCRYPTION_KEY`    | Genau 64 Hex-Zeichen; AES-256-GCM-Schlüssel für SMTP-Passwörter                          |
+| `ENCRYPTION_KEY`    | Genau 64 Hex-Zeichen; AES-256-GCM-Schlüssel für SMTP-Passwörter und Push-Schlüssel                          |
 | `SETUP_KEY`         | Zusätzlicher Installationsschlüssel; in Production erforderlich, in Development optional |
 | `TRUST_PROXY`       | Nur `true`, wenn der vorgeschaltete Proxy `X-Forwarded-For` zuverlässig überschreibt     |
 | `TEST_DATABASE_URL` | Ausschließlich für Tests: separate Datenbank, deren Name auf `_test` endet               |
 
 Secrets sind ausschließlich serverseitig und werden nicht committed. Den Verschlüsselungsschlüssel zusammen mit einem Datenbankbackup getrennt und sicher aufbewahren. Ein Wechsel des Session-Secrets meldet alle Sitzungen ab. Bei Wechsel des Verschlüsselungsschlüssels muss SMTP neu eingerichtet werden.
+
+## Push-Benachrichtigungen
+
+Unter **Benachrichtigungen** (`/settings`) können alle Konten Push freiwillig pro Gerät und Browser aktivieren, testen und deaktivieren. Auf der Übersicht erscheint ein überspringbarer Hinweis. „Später“ blendet nur diesen Hinweis aus; die Aktivierung bleibt in den Einstellungen möglich. Bei ausdrücklich blockierter Browserberechtigung erklärt die Anwendung, wo die Erlaubnis nachträglich geändert werden kann.
+
+- Buchung, Verschiebung und Absage benachrichtigen den Patienten und den aktiven Behandler mit aktiviertem Push. Sonstige Statusänderungen benachrichtigen den Patienten. E-Mail-Einstellungen bleiben unabhängig davon erhalten.
+- Optional gibt es eine Erinnerung an eigene Termine etwa 24 Stunden vorher. Bei kurzfristig gebuchten Terminen erfolgt sie frühestens fünf Minuten nach der Buchung und nur bis fünf Minuten vor Beginn. Nach einer Verschiebung wird die Erinnerung für den neuen Zeitpunkt zurückgesetzt.
+- Nachrichten enthalten keine Namen oder Behandlungsdetails und öffnen die geschützte Übersicht. Beim Abmelden wird die Gerätezuordnung entfernt; nach erneuter Anmeldung kann Push wieder aktiviert werden.
+- Auf iPhone/iPad muss SchwesterLib zuerst über Safari → Teilen → Zum Home-Bildschirm installiert und von dort geöffnet werden (iOS/iPadOS 16.4 oder neuer). Manifest und App-Symbole werden mitgeliefert.
+
+**Betrieb:** Die Migration `202609090001_web_push` mit `npm run db:migrate` anwenden, anschließend bauen und neu starten. HTTPS ist erforderlich (localhost ist für Entwicklung ausgenommen). Die VAPID-Schlüssel werden beim ersten authentifizierten Aufruf automatisch erzeugt und dauerhaft gespeichert; der private Schlüssel wird mit dem vorhandenen `ENCRYPTION_KEY` verschlüsselt. Es ist kein separater Push-Anbieter-Account nötig. Datenbank und Verschlüsselungsschlüssel gemeinsam erhalten; ein Schlüsselwechsel erfordert auch die Wiederherstellung bzw. Neueinrichtung der Push-Konfiguration.
+
+Der dauerhaft laufende Next.js-Server startet automatisch einen Erinnerungsprozess mit einer Prüfung pro Minute. PostgreSQL-Sperren koordinieren mehrere Instanzen und Buchungsänderungen. Bei Fehlern werden Erinnerungen erneut versucht, abgelaufene Push-Abonnements werden entfernt. Die Zustellung bleibt vom Browser, dem Gerät und dem Push-Dienst abhängig. Buchungen bleiben auch bei Versandfehlern gespeichert; Fehler werden ohne Geräteadressen oder Schlüssel protokolliert. Für Serverless-Hosting mit pausierenden Prozessen wäre ein externer Scheduler nötig.
+
+Optional: `VAPID_SUBJECT=mailto:betreiber@example.org` als Kontakt für Push-Dienste; sonst wird `APP_URL` verwendet. Für echte Push-Tests auf localhost eine gültige Kontaktadresse setzen. `PUSH_REMINDERS_DISABLED=true` deaktiviert nur den Erinnerungsprozess, beispielsweise für Browser-Tests. Ausgehendes HTTPS zu den Browser-Push-Diensten von Google, Mozilla, Apple bzw. Microsoft muss möglich sein.
+
+Technische Referenzen: [Next.js PWA-Anleitung](https://nextjs.org/docs/app/guides/progressive-web-apps), [Web-Push-Bibliothek](https://github.com/web-push-libs/web-push), [Browser-Abonnement](https://developer.mozilla.org/en-US/docs/Web/API/PushManager/subscribe).
 
 ## Ersten Administrator erstellen
 

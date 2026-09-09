@@ -40,6 +40,15 @@ import {
 } from "@/lib/scheduling";
 import { profileSchema, typeSchema } from "@/lib/validation";
 import { appointmentMail, saveSmtp, sendMail, smtpAction } from "@/lib/mail";
+import {
+  appointmentPush,
+  pushConfiguration,
+  savePushSubscription,
+  removePushSubscription,
+  pushDevice,
+  setPushReminders,
+  testPush,
+} from "@/lib/push";
 import { requestUpdate, updateInfo } from "@/lib/updates";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -105,7 +114,20 @@ async function handle(req: NextRequest, ctx: Context) {
     else {
       const actor = await requireUser();
       if (post) await rateLimit(`mutation:${actor.id}`, 120, 1);
-      if (path === "catalog" && !post)
+      if (path === "push/config" && !post) {
+        result = { publicKey: (await pushConfiguration()).publicKey };
+      } else if (path === "push/subscribe" && post) {
+        await savePushSubscription(actor, data);
+      } else if (path === "push/unsubscribe" && post) {
+        await removePushSubscription(actor, data);
+      } else if (path === "push/device" && post) {
+        result = await pushDevice(actor, data);
+      } else if (path === "push/reminders" && post) {
+        await setPushReminders(actor, data);
+      } else if (path === "push/test" && post) {
+        await rateLimit(`push-test:${actor.id}`, 5, 1);
+        await testPush(actor, data);
+      } else if (path === "catalog" && !post)
         result = await db.providerProfile.findMany({
           where: { active: true, user: { active: true, role: "PROVIDER" } },
           include: {
@@ -142,6 +164,14 @@ async function handle(req: NextRequest, ctx: Context) {
         });
       else if (path === "appointments/book" && post) {
         const appointment = await bookAppointment(actor, data);
+        await appointmentPush(
+          appointment.id,
+          (data as { appointmentId?: string }).appointmentId
+            ? "verschoben"
+            : "gebucht",
+        ).catch(() =>
+          console.warn("Termin gespeichert; Push-Versand fehlgeschlagen."),
+        );
         result = { appointment, mailSent: true };
         try {
           await appointmentMail(
@@ -155,6 +185,12 @@ async function handle(req: NextRequest, ctx: Context) {
         }
       } else if (path === "appointments/status" && post) {
         const a = await changeAppointmentStatus(actor, data);
+        await appointmentPush(
+          a.id,
+          a.status === "CANCELLED" ? "abgesagt" : "aktualisiert",
+        ).catch(() =>
+          console.warn("Termin gespeichert; Push-Versand fehlgeschlagen."),
+        );
         result = { appointment: a, mailSent: true };
         try {
           await appointmentMail(

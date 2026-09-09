@@ -12,6 +12,7 @@ process.env.APP_URL = "http://localhost:3100";
 process.env.SESSION_SECRET = randomBytes(48).toString("base64url");
 process.env.ENCRYPTION_KEY = randomBytes(32).toString("hex");
 process.env.SETUP_KEY = "browser-test-setup";
+process.env.PUSH_REMINDERS_DISABLED = "true";
 
 export default defineConfig({
   testDir: "./tests/browser",

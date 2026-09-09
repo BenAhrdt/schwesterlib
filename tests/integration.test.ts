@@ -24,6 +24,12 @@ import {
   saveProvider,
 } from "../src/lib/scheduling";
 import { type Actor, requireRole } from "../src/lib/auth";
+import {
+  pushDevice,
+  removePushSubscription,
+  savePushSubscription,
+  setPushReminders,
+} from "../src/lib/push";
 import { digest, rateLimit } from "../src/lib/security";
 const enabled = !!process.env.DATABASE_URL;
 const password = "A long unique test password 2026!";
@@ -323,6 +329,46 @@ describe.skipIf(!enabled)("PostgreSQL-Integration", () => {
       ),
     ).toBe(true);
   });
+  it("speichert Push pro Konto und Gerät und schützt fremde Abonnements", async () => {
+    await fixture();
+    process.env.ENCRYPTION_KEY ??= "ab".repeat(32);
+    const input = {
+      endpoint: "https://fcm.googleapis.com/fcm/send/integration-device",
+      keys: {
+        p256dh: Buffer.concat([Buffer.from([4]), Buffer.alloc(64)]).toString(
+          "base64url",
+        ),
+        auth: Buffer.alloc(16).toString("base64url"),
+      },
+    };
+    await savePushSubscription(user, input);
+    expect(await pushDevice(user, input)).toEqual({
+      active: true,
+      reminders: true,
+    });
+    expect(await pushDevice(other, input)).toEqual({
+      active: false,
+      reminders: true,
+    });
+    await removePushSubscription(other, input);
+    expect(await db.pushSubscription.count()).toBe(1);
+    await expect(
+      setPushReminders(other, { ...input, reminders: false }),
+    ).rejects.toThrow("zuerst aktivieren");
+    await setPushReminders(user, { ...input, reminders: false });
+    expect(await pushDevice(user, input)).toEqual({
+      active: true,
+      reminders: false,
+    });
+    await savePushSubscription(other, input);
+    expect(await pushDevice(user, input)).toEqual({
+      active: false,
+      reminders: true,
+    });
+    expect(await db.pushSubscription.count()).toBe(1);
+    await removePushSubscription(other, input);
+    expect(await db.pushSubscription.count()).toBe(0);
+  });
   it("verschiebt atomar und behält Original bei belegtem Ziel", async () => {
     await fixture();
     const a = await bookAppointment(user, { providerId, typeId, startsAt });
@@ -343,6 +389,10 @@ describe.skipIf(!enabled)("PostgreSQL-Integration", () => {
         await db.appointment.findUniqueOrThrow({ where: { id: a.id } })
       ).startsAt.toISOString(),
     ).toBe(startsAt);
+    await db.appointment.update({
+      where: { id: a.id },
+      data: { pushReminderAt: new Date() },
+    });
     const free = new Date(
       new Date(startsAt).getTime() + 30 * 60000,
     ).toISOString();
@@ -357,6 +407,10 @@ describe.skipIf(!enabled)("PostgreSQL-Integration", () => {
         await db.appointment.findUniqueOrThrow({ where: { id: a.id } })
       ).startsAt.toISOString(),
     ).toBe(free);
+    expect(
+      (await db.appointment.findUniqueOrThrow({ where: { id: a.id } }))
+        .pushReminderAt,
+    ).toBeNull();
   });
   it("verhindert Abwesenheit über bereits gebuchten Terminen", async () => {
     await fixture();

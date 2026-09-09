@@ -36,6 +36,23 @@ model User {
   sessions Session[]
   passwordResetTokens PasswordResetToken[]
   appointments Appointment[]
+  pushSubscriptions PushSubscription[]
+}
+model PushConfiguration {
+  id Int @id @default(1)
+  publicKey String
+  privateKeyEncrypted String
+}
+model PushSubscription {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint String @unique
+  p256dh String
+  auth String
+  reminders Boolean @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([userId])
 }
 model PasswordResetToken {
   id String @id @default(cuid())
@@ -120,6 +137,7 @@ model Appointment {
   occupiedStart DateTime @db.Timestamptz(3)
   occupiedEnd DateTime @db.Timestamptz(3)
   status AppointmentStatus @default(CONFIRMED)
+  pushReminderAt DateTime? @db.Timestamptz(3)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   @@index([providerId, startsAt])
   @@index([userId, startsAt])

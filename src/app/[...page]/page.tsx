@@ -38,6 +38,14 @@ export default async function Page({
             Bildanbieter geladen.
           </p>
           <p>
+            Bei freiwillig aktivierten Push-Benachrichtigungen speichern wir die
+            Geräteadresse und die für den verschlüsselten Versand notwendigen
+            Schlüssel. Die Zustellung erfolgt über den Push-Dienst deines
+            Browseranbieters. Nachrichten enthalten keine Namen oder
+            Behandlungsdetails. Du kannst Push unter Benachrichtigungen
+            deaktivieren; dabei wird die Gerätezuordnung gelöscht.
+          </p>
+          <p>
             Für Auskunft, Berichtigung oder Löschung wende dich an den
             Administrator dieser privaten Installation. Betreiberangaben,
             Rechtsgrundlage und Aufbewahrungsfristen müssen vor einem
@@ -143,6 +151,7 @@ export default async function Page({
     "book",
     "appointments",
     "profile",
+    "settings",
     "calendar",
     "admin",
     "admin/appointments",

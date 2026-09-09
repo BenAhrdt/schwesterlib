@@ -23,7 +23,7 @@ test.beforeAll(async () => {
   if (!new URL(process.env.DATABASE_URL!).pathname.endsWith("_test"))
     throw new Error("Nur Testdatenbanken erlaubt.");
   await db.$executeRawUnsafe(
-    'TRUNCATE "Appointment", "AvailabilityException", "AvailabilityRule", "_AppointmentTypeToProviderProfile", "AppointmentType", "ProviderProfile", "Session", "User", "Invitation", "AuditLog", "AppSettings", "EmailConfiguration", "RateLimit" CASCADE',
+    'TRUNCATE "PushConfiguration", "Appointment", "AvailabilityException", "AvailabilityRule", "_AppointmentTypeToProviderProfile", "AppointmentType", "ProviderProfile", "Session", "User", "Invitation", "AuditLog", "AppSettings", "EmailConfiguration", "RateLimit" CASCADE',
   );
 });
 test.afterAll(async () => {
@@ -120,6 +120,19 @@ test("Setup, Einladung, mobile Buchung, Verschieben, Absage und API-Rechte", asy
     active: true,
     providerIds: [providerId],
   });
+  await providerPage.goto("/provider/types");
+  await expect(providerPage.getByText("Buchbare Behandler")).toHaveCount(0);
+  await providerPage
+    .getByRole("button", { name: "Terminart erstellen" })
+    .click();
+  await expect(
+    providerPage.getByText(
+      "Diese Terminart ist ausschließlich deinem Behandlerprofil zugeordnet.",
+    ),
+  ).toBeVisible();
+  await expect(
+    providerPage.getByRole("checkbox", { name: /Schwester Anna/ }),
+  ).toHaveCount(0);
   const date = format(addDays(new Date(), 2), "yyyy-MM-dd");
   await providerPage.goto("/provider/availability");
   await providerPage

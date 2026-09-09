@@ -210,6 +210,7 @@ export async function bookAppointment(actor: Actor, input: unknown) {
       endsAt,
       occupiedStart: addMinutes(startsAt, -type.bufferBefore),
       occupiedEnd: addMinutes(endsAt, type.bufferAfter),
+      pushReminderAt: null,
     };
     const appointment = existing
       ? await tx.appointment.update({

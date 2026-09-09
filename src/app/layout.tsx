@@ -6,6 +6,12 @@ export const metadata: Metadata = {
     template: "%s · SchwesterLib",
   },
   description: "Persönliche Terminbuchung für die familieninterne Versorgung.",
+  appleWebApp: {
+    capable: true,
+    title: "SchwesterLib",
+    statusBarStyle: "default",
+  },
+  icons: { apple: "/icon-192.png" },
   robots: { index: false, follow: false },
 };
 export default function RootLayout({

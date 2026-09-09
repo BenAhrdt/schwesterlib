@@ -22,6 +22,7 @@ import {
 import { de } from "date-fns/locale";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import {
+  Bell,
   ArrowRight,
   CalendarDays,
   LayoutDashboard,
@@ -51,6 +52,7 @@ import type { Actor } from "@/lib/auth";
 import { Brand } from "./brand";
 import { Button } from "./ui/button";
 import { api, Field } from "./forms";
+import { PushSettings, detachPushOnLogout } from "./push-settings";
 type Type = {
   id: string;
   name: string;
@@ -235,6 +237,7 @@ export function Workspace({ user, path }: { user: Actor; path: string }) {
     { href: "/book", label: "Termin buchen", icon: Plus },
     { href: "/appointments", label: "Meine Termine", icon: CalendarDays },
     { href: "/profile", label: "Mein Profil", icon: UserRound },
+    { href: "/settings", label: "Benachrichtigungen", icon: Bell },
     ...(isAdmin
       ? [
           { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -286,7 +289,7 @@ export function Workspace({ user, path }: { user: Actor; path: string }) {
         <nav>
           {links.map((l, i) => (
             <div key={l.href}>
-              {i === 4 && (
+              {i === 5 && (
                 <div className="nav-caption">
                   {isAdmin ? "ADMINISTRATION" : "MEINE PRAXIS"}
                 </div>
@@ -312,6 +315,7 @@ export function Workspace({ user, path }: { user: Actor; path: string }) {
             aria-label="Abmelden"
             onClick={async () => {
               try {
+                await detachPushOnLogout();
                 await api("logout", {});
                 router.push("/login");
                 router.refresh();
@@ -357,7 +361,12 @@ export function Workspace({ user, path }: { user: Actor; path: string }) {
               </Button>
             )}
           </div>
-          {["dashboard", "admin", "provider"].includes(path) ? (
+          {["dashboard", "admin", "provider"].includes(path) && (
+            <PushSettings userId={user.id} provider={isProvider} prompt />
+          )}
+          {path === "settings" ? (
+            <PushSettings userId={user.id} provider={isProvider} />
+          ) : ["dashboard", "admin", "provider"].includes(path) ? (
             <Dashboard user={user} admin={path === "admin"} />
           ) : path === "book" ? (
             <Booking />
@@ -376,7 +385,7 @@ export function Workspace({ user, path }: { user: Actor; path: string }) {
             path.endsWith("availability") ? (
             <Providers availability={path.endsWith("availability")} />
           ) : path.endsWith("types") ? (
-            <Types />
+            <Types user={user} />
           ) : path.endsWith("settings") ? (
             <SettingsPanel />
           ) : path.endsWith("audit") ? (
@@ -1828,10 +1837,15 @@ function Availability({
     </>
   );
 }
-function Types() {
+function Types({ user }: { user: Actor }) {
   const { data, error, refresh } = useData<Type[]>("types");
   const providers = useData<Provider[]>("providers");
   const [create, setCreate] = useState(false);
+  const isAdmin = user.role === "ADMIN";
+  const ownProviderId = user.provider?.id;
+  const isShared = (t: Type) =>
+    !isAdmin &&
+    (t.providers?.length !== 1 || t.providers[0]?.id !== ownProviderId);
   function editor(t?: Type) {
     return (
       <ActionForm
@@ -1849,10 +1863,13 @@ function Types() {
           bufferAfter: Number(d.bufferAfter),
           active: d.active === "on",
           color: d.color,
-          providerIds:
-            providers.data
-              ?.filter((p) => d[`provider-${p.id}`] === "on")
-              .map((p) => p.id) ?? [],
+          providerIds: isAdmin
+            ? (providers.data
+                ?.filter((p) => d[`provider-${p.id}`] === "on")
+                .map((p) => p.id) ?? [])
+            : ownProviderId
+              ? [ownProviderId]
+              : [],
         })}
       >
         <div className="form-grid">
@@ -1902,17 +1919,28 @@ function Types() {
           />
           Aktive Terminart
         </label>
-        <strong>Buchbare Behandler</strong>
-        {providers.data?.map((p) => (
-          <label key={p.id} className="checkbox">
-            <input
-              type="checkbox"
-              name={`provider-${p.id}`}
-              defaultChecked={t?.providers?.some((v) => v.id === p.id) ?? false}
-            />
-            {p.user.displayName}
-          </label>
-        ))}
+        {isAdmin ? (
+          <>
+            <strong>Buchbare Behandler</strong>
+            {providers.data?.map((p) => (
+              <label key={p.id} className="checkbox">
+                <input
+                  type="checkbox"
+                  name={`provider-${p.id}`}
+                  defaultChecked={
+                    t?.providers?.some((v) => v.id === p.id) ?? false
+                  }
+                />
+                {p.user.displayName}
+              </label>
+            ))}
+          </>
+        ) : (
+          <p className="muted">
+            Diese Terminart ist ausschließlich deinem Behandlerprofil
+            zugeordnet.
+          </p>
+        )}
       </ActionForm>
     );
   }
@@ -1944,7 +1972,20 @@ function Types() {
                 </span>
                 <Settings size={16} />
               </summary>
-              {editor(t)}
+              {isShared(t) ? (
+                <div className="form-stack">
+                  <p>{t.description || "Keine Beschreibung hinterlegt."}</p>
+                  <p className="muted">
+                    Dauer: {t.duration} Minuten · Puffer vorher: {t.bufferBefore}
+                    Minuten · Puffer danach: {t.bufferAfter} Minuten
+                  </p>
+                  <p className="alert">
+                    Diese gemeinsame Terminart wird vom Administrator verwaltet.
+                  </p>
+                </div>
+              ) : (
+                editor(t)
+              )}
             </details>
           ))
         ) : (
