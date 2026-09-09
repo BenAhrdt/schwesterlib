@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, LockKeyhole } from "lucide-react";
 import { Button } from "./ui/button";
+export class ApiUnavailableError extends Error {}
 export async function api<T = unknown>(
   path: string,
   data?: unknown,
@@ -13,7 +14,12 @@ export async function api<T = unknown>(
     headers: data === undefined ? {} : { "Content-Type": "application/json" },
     ...(data === undefined ? {} : { body: JSON.stringify(data) }),
   });
-  const result = await response.json();
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json"))
+    throw new ApiUnavailableError(
+      "Der Server ist vorübergehend nicht erreichbar.",
+    );
+  const result = (await response.json()) as T & { error?: string };
   if (!response.ok)
     throw new Error(result.error ?? "Die Anfrage ist fehlgeschlagen.");
   return result;

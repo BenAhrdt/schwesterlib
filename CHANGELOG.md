@@ -2,6 +2,12 @@
 
 Alle wesentlichen Änderungen an SchwesterLib werden in dieser Datei dokumentiert.
 
+## [1.4.1] – 2026-09-09
+
+### Behoben
+
+- Während des automatischen Neustarts beim Web-Update werden vorübergehende HTML-Antworten nicht mehr als technischer JSON-Parserfehler angezeigt. Die Oberfläche wartet weiter auf die wieder gestartete Anwendung; echte Fehler bleiben sichtbar.
+
 ## [1.4.0] – 2026-09-09
 
 ### Neu
@@ -67,6 +73,7 @@ Alle wesentlichen Änderungen an SchwesterLib werden in dieser Datei dokumentier
 
 - Erste vollständige Version mit geschlossenem Einladungssystem, Rollen, Terminverwaltung, Verfügbarkeiten, Kalender, SMTP-Konfiguration und abgesichertem Initial-Setup.
 
+[1.4.1]: https://github.com/BenAhrdt/schwesterlib/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/BenAhrdt/schwesterlib/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/BenAhrdt/schwesterlib/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/BenAhrdt/schwesterlib/compare/v1.1.0...v1.2.0

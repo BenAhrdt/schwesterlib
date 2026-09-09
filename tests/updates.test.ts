@@ -32,7 +32,7 @@ describe("Web-Updates", () => {
   it("erkennt ein neueres veröffentlichtes Release", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(release("v1.5.0")));
     const info = await updateInfo();
-    expect(info.currentVersion).toBe("1.4.0");
+    expect(info.currentVersion).toBe("1.4.1");
     expect(info.latestVersion).toBe("v1.5.0");
     expect(info.updateAvailable).toBe(true);
     expect(info.configured).toBe(true);

@@ -51,7 +51,7 @@ import {
 import type { Actor } from "@/lib/auth";
 import { Brand } from "./brand";
 import { Button } from "./ui/button";
-import { api, Field } from "./forms";
+import { api, ApiUnavailableError, Field } from "./forms";
 import { PushSettings, detachPushOnLogout } from "./push-settings";
 type Type = {
   id: string;
@@ -2174,20 +2174,26 @@ function UpdatePanel() {
     [checking, setChecking] = useState(true),
     [installing, setInstalling] = useState(false);
   const initiated = useRef(false);
+  const waitingForRestart = useRef(false);
   const check = useCallback(async () => {
     try {
       const next = await api<UpdateInfo>("updates");
       setInfo(next);
       setError("");
-      if (["requested", "running"].includes(next.status.state))
+      if (["requested", "running"].includes(next.status.state)) {
         setInstalling(true);
+        waitingForRestart.current = true;
+      } else {
+        waitingForRestart.current = false;
+      }
       if (next.status.state === "failed") setInstalling(false);
       if (next.status.state === "success" && initiated.current) {
         initiated.current = false;
         window.setTimeout(() => window.location.reload(), 1200);
       }
     } catch (cause) {
-      if (!initiated.current) setError((cause as Error).message);
+      if (!initiated.current && !waitingForRestart.current)
+        setError((cause as Error).message);
     } finally {
       setChecking(false);
     }
@@ -2212,6 +2218,7 @@ function UpdatePanel() {
     )
       return;
     initiated.current = true;
+    waitingForRestart.current = true;
     setInstalling(true);
     setError("");
     try {
@@ -2219,8 +2226,16 @@ function UpdatePanel() {
     } catch (cause) {
       // The application can disconnect immediately after accepting the request.
       window.setTimeout(() => void check(), 1500);
-      if (cause instanceof Error && cause.message !== "Failed to fetch")
-        setError(cause.message);
+      if (!(cause instanceof ApiUnavailableError) && !(cause instanceof TypeError)) {
+        initiated.current = false;
+        waitingForRestart.current = false;
+        setInstalling(false);
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "Die Updateanfrage ist fehlgeschlagen.",
+        );
+      }
     }
   }
   const active =
